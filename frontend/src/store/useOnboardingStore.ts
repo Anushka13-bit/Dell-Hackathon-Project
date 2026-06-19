@@ -1,6 +1,22 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 
+export interface ParsedResumeData {
+  name?: string | null;
+  college_name?: string | null;
+  degree?: string | null;
+  github_url?: string | null;
+  raw_skills?: string[];
+  experience_summary?: string;
+  projects?: string[];
+}
+
+export interface OnboardingAiData {
+  parsed_resume: ParsedResumeData;
+  skill_vector: Record<string, number>;
+  semantic_embedding: number[];
+}
+
 export interface OnboardingState {
   step: number;
   fullName: string;
@@ -20,6 +36,7 @@ export interface OnboardingState {
   };
   resumeUploaded: boolean;
   onboardingComplete: boolean;
+  aiData: OnboardingAiData | null;
 
   // Actions
   nextStep: () => void;
@@ -41,13 +58,14 @@ const initialState = {
   links: { linkedin: '', github: '' },
   resumeUploaded: false,
   onboardingComplete: false,
+  aiData: null,
 };
 
 export const useOnboardingStore = create<OnboardingState>()(
   devtools(
     (set) => ({
       ...initialState,
-      nextStep: () => set((state) => ({ step: Math.min(state.step + 1, 8) })),
+      nextStep: () => set((state) => ({ step: Math.min(state.step + 1, 7) })),
       prevStep: () => set((state) => ({ step: Math.max(state.step - 1, 1) })),
       setStep: (step: number) => set({ step }),
       updateData: (data) => set((state) => ({ ...state, ...data })),

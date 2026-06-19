@@ -9,7 +9,7 @@ import Webcam from "react-webcam";
 
 type FaceState = "waiting" | "detected" | "scanning" | "verified" | "error";
 
-export default function Step4FaceVerify() {
+export default function Step5FaceVerify() {
   const { updateData, nextStep } = useOnboardingStore();
   const [faceState, setFaceState] = useState<FaceState>("waiting");
   const webcamRef = useRef<Webcam>(null);

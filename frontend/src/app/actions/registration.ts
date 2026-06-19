@@ -1,11 +1,27 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
-import { getDecisionForRegistration } from '@/components/registrations/registrationIntelligenceModel'
+import {
+  type RegistrationCase,
+  computeWeightedScore,
+  getDecisionForRegistration,
+} from '@/components/registrations/registrationIntelligenceModel'
+
+export type SubmitRegistrationPayload = {
+  name: string
+  email: string
+  college: string
+  github: string
+  skills?: string[]
+  phone?: string
+  faceScanConsented?: boolean
+  faceScanStatus?: RegistrationCase['faceScan']['status']
+  faceScanScore?: number | null
+}
 
 // Note: In a real environment, you'd perform FaceScan/RapidFuzz calls here.
 // For now, we simulate the "intelligence" using the frontend model logic.
-export async function submitRegistration(payload: any) {
+export async function submitRegistration(payload: SubmitRegistrationPayload) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -16,8 +32,24 @@ export async function submitRegistration(payload: any) {
 
   // 1. Generate Intelligence Decision
   // We mock exactSignals and similarity based on the PRD for this participant
-  const intelligencePayload = {
-    ...payload,
+  const intelligencePayload: RegistrationCase = {
+    id: 'pending',
+    name: payload.name,
+    email: payload.email,
+    college: payload.college,
+    github: payload.github,
+    submittedAt: new Date().toISOString(),
+    decision: 'AUTO_APPROVED',
+    score: 0,
+    matchedProfile: 'No close match',
+    matchedProfileNote: 'Pending deterministic duplicate scan.',
+    initials: payload.name
+      .split(' ')
+      .map((part) => part[0])
+      .join('')
+      .substring(0, 2)
+      .toUpperCase(),
+    skills: payload.skills || [],
     exactSignals: {
       email: false,
       phone: false,
@@ -30,22 +62,16 @@ export async function submitRegistration(payload: any) {
     deviceMatch: false,
     ipSubnetMatch: false,
     faceScan: {
-      status: 'verified',
-      score: 0.95,
-      consented: true,
+      status: payload.faceScanStatus ?? 'verified',
+      score: payload.faceScanScore ?? 0.95,
+      consented: payload.faceScanConsented ?? true,
       dataDeletedAt: new Date().toISOString(),
-    }
+    },
+    recommendation: 'Pending deterministic duplicate scan.',
   }
 
   const decision = getDecisionForRegistration(intelligencePayload)
-  
-  // Compute score for storage
-  // Note: we can import computeWeightedScore if we need it
-  let score = 0;
-  if (decision === 'HARD_DUPLICATE') score = 1.0;
-  else if (decision === 'POTENTIAL_DUPLICATE') score = 0.9;
-  else if (decision === 'MANUAL_REVIEW') score = 0.75;
-  else score = 0.2;
+  const score = computeWeightedScore(intelligencePayload)
 
   // 2. Persist to Supabase
   const dbPayload = {

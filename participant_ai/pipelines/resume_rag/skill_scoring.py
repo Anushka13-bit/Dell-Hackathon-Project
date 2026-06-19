@@ -5,6 +5,8 @@ from typing import Tuple
 from participant_ai.core.llm import call_json_async
 from participant_ai.core.schemas import SkillVector
 from participant_ai.core.skill_taxonomy import SKILL_TAXONOMY, category_names
+from participant_ai.core.embeddings import generate_embedding
+from participant_ai.core.skill_taxonomy import SKILL_TAXONOMY, category_names
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +73,7 @@ Strict JSON only."""
             
     return cleaned
 
-async def compute_skill_vector(resume_text: str, projects: list[str]) -> Tuple[SkillVector, dict]:
+async def compute_skill_vector(resume_text: str, projects: list[str]) -> Tuple[SkillVector, list[float], dict]:
     """Combines all three components using the weighted formula."""
     valid_cats = category_names()
     breakdown_dict = {}
@@ -101,4 +103,5 @@ async def compute_skill_vector(resume_text: str, projects: list[str]) -> Tuple[S
         }
         
     vector = SkillVector.from_dict(final_scores)
-    return vector, breakdown_dict
+    embedding = generate_embedding(resume_text + " " + " ".join(projects))
+    return vector, embedding, breakdown_dict

@@ -7,7 +7,7 @@ export default function ParticipantTopNav() {
       <div className="flex justify-between items-center px-6 md:px-margin-desktop py-4 max-w-[1280px] mx-auto">
         <div className="flex items-center gap-10">
           <Link href="/participant/dashboard" className="block">
-            <Image src="/logo.svg" alt="HackOS" width={100} height={28} className="h-7 w-auto object-contain" />
+            <Image src="/logo.png" alt="HackOS" width={600} height={168} className="h-[168px] w-auto object-contain" />
           </Link>
           <div className="hidden md:flex gap-8 items-center">
             <Link className="text-on-surface-variant font-label-md hover:text-primary transition-colors duration-200" href="/participant/dashboard">Dashboard</Link>

@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight, Mail, Lock } from "lucide-react";
 import { login, signup } from "../actions";
 
-export default function ParticipantAuthPage() {
+function ParticipantAuthContent() {
   const searchParams = useSearchParams();
   const errorMessage = searchParams.get("error");
   const [isSignIn, setIsSignIn] = useState(true);
@@ -109,5 +109,13 @@ export default function ParticipantAuthPage() {
         </Link>
       </div>
     </motion.div>
+  );
+}
+
+export default function ParticipantAuthPage() {
+  return (
+    <Suspense fallback={null}>
+      <ParticipantAuthContent />
+    </Suspense>
   );
 }

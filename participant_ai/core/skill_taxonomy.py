@@ -33,13 +33,21 @@ SKILL_TAXONOMY: dict[str, dict] = {
             "interaction design", "mockup", "invision", "user journey", "usability testing"
         ],
     },
-    "devops": {
+    "cloud": {
         "weight": 1.0,
         "keywords": [
-            "docker", "kubernetes", "k8s", "ci/cd", "jenkins", "aws", "gcp", "azure",
-            "terraform", "ansible", "github actions", "linux", "nginx", "prometheus",
-            "grafana", "bash", "shell scripting", "gitlab ci", "argocd", "cloudformation"
+            "aws", "gcp", "azure", "cloud computing", "serverless", "lambda",
+            "ec2", "s3", "google cloud", "firebase", "supabase", "cloudflare"
         ],
+    },
+    "security": {
+        "weight": 1.0,
+        "keywords": [
+            "penetration testing", "pentesting", "wireshark", "cryptography",
+            "network security", "owasp", "metasploit", "nmap", "iam",
+            "vulnerability assessment", "firewall", "kali linux", "soc", "siem",
+            "malware analysis", "endpoint security", "cybersecurity"
+        ]
     },
     "mobile": {
         "weight": 1.0,
@@ -49,29 +57,28 @@ SKILL_TAXONOMY: dict[str, dict] = {
             "ios", "android", "capacitor", "ionic", "mobile app"
         ],
     },
-    "data": {
+    "data_engineering": {
         "weight": 1.0,
         "keywords": [
-            "pandas", "numpy", "sql", "etl", "spark", "tableau", "power bi",
-            "data pipeline", "airflow", "data warehouse", "dbt", "snowflake",
-            "bigquery", "redshift", "hadoop", "pyspark", "data engineering", "kafka"
+            "pandas", "numpy", "sql", "etl", "spark", "airflow", "data warehouse", 
+            "dbt", "snowflake", "bigquery", "redshift", "hadoop", "pyspark", 
+            "data engineering", "kafka", "data pipeline"
         ],
     },
-    "cybersecurity": {
+    "devops": {
         "weight": 1.0,
         "keywords": [
-            "penetration testing", "pentesting", "wireshark", "cryptography",
-            "network security", "owasp", "metasploit", "nmap", "iam",
-            "vulnerability assessment", "firewall", "kali linux", "soc", "siem",
-            "malware analysis", "endpoint security", "burp suite"
-        ]
+            "docker", "kubernetes", "k8s", "ci/cd", "jenkins", "terraform", 
+            "ansible", "github actions", "linux", "nginx", "prometheus",
+            "grafana", "bash", "shell scripting", "gitlab ci", "argocd", "cloudformation"
+        ],
     },
-    "blockchain": {
+    "product": {
         "weight": 1.0,
         "keywords": [
-            "solidity", "web3", "smart contracts", "ethereum", "nft", "defi",
-            "dapp", "bitcoin", "cryptocurrency", "polygon", "rust", "ethers.js",
-            "web3.js", "ipfs", "hyperledger", "consensus", "tokenomics"
+            "product management", "agile", "scrum", "jira", "roadmap", 
+            "user stories", "market research", "growth hacking", "kpi", 
+            "business strategy", "go-to-market", "analytics"
         ]
     }
 }

@@ -22,6 +22,7 @@ def _parse_prompt(resume_text: str) -> str:
 Return JSON with keys:
 - name (string or null)
 - college_name (string or null)
+- degree (string or null — if the resume mentions B.Tech, BTech, B.E., or similar, you MUST normalize and output exactly "Bachelor")
 - github_url (string or null — only if explicitly present, never invent)
 - raw_skills (array of strings — skills/tech as literally written)
 - experience_summary (string, 2-3 sentences)
@@ -48,6 +49,7 @@ def _coerce_parsed(data: dict) -> ParsedResume:
     return ParsedResume(
         name=str(data["name"]) if data.get("name") else None,
         college_name=str(data["college_name"]) if data.get("college_name") else None,
+        degree=str(data["degree"]) if data.get("degree") else None,
         github_url=str(data["github_url"]) if data.get("github_url") else None,
         raw_skills=[str(s) for s in raw_skills if s],
         experience_summary=summary,
@@ -63,7 +65,7 @@ async def parse_resume_async(resume_text: str) -> ParsedResume:
 async def parse_and_vectorize_batch(
     resume_texts: list[str],
     max_concurrency: int = 10,
-) -> list[tuple[ParsedResume, SkillVector, dict]]:
+) -> list[tuple[ParsedResume, SkillVector, list[float], dict]]:
     """Parse and vectorize all resumes with bounded concurrency.
 
     One person = parse then vectorize (sequential). Many people run in parallel
@@ -71,11 +73,11 @@ async def parse_and_vectorize_batch(
     """
     semaphore = asyncio.Semaphore(max_concurrency)
 
-    async def _one(text: str) -> tuple[ParsedResume, SkillVector, dict]:
+    async def _one(text: str) -> tuple[ParsedResume, SkillVector, list[float], dict]:
         async with semaphore:
             parsed = await parse_resume_async(text)
-            vector, breakdown = await compute_skill_vector(text, parsed.projects)
-            return parsed, vector, breakdown
+            vector, embedding, breakdown = await compute_skill_vector(text, parsed.projects)
+            return parsed, vector, embedding, breakdown
 
     return await asyncio.gather(
         *[_one(text) for text in resume_texts]

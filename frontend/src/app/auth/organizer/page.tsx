@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight, Mail, Lock, Building2 } from "lucide-react";
 import { loginOrganizer, signupOrganizer } from "../actions";
 
-export default function OrganizerAuthPage() {
+function OrganizerAuthContent() {
   const searchParams = useSearchParams();
   const errorMessage = searchParams.get("error");
   const [isSignIn, setIsSignIn] = useState(true);
@@ -117,5 +117,13 @@ export default function OrganizerAuthPage() {
         </Link>
       </div>
     </motion.div>
+  );
+}
+
+export default function OrganizerAuthPage() {
+  return (
+    <Suspense fallback={null}>
+      <OrganizerAuthContent />
+    </Suspense>
   );
 }

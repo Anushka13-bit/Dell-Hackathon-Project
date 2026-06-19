@@ -1,4 +1,4 @@
-"""Thin OpenAI JSON wrapper shared by pipelines."""
+"""Thin Gemini JSON wrapper shared by pipelines."""
 
 from __future__ import annotations
 
@@ -9,15 +9,15 @@ import os
 import re
 from typing import Any, Optional
 
-from groq import AsyncGroq
-import groq
+from google import genai
+from google.genai import types
 
 logger = logging.getLogger(__name__)
 
-OPENAI_MODEL = "llama-3.1-8b-instant"
+GEMINI_MODEL = "gemini-2.5-flash"
 
-_MAX_RETRIES = 2
-_INITIAL_BACKOFF_SECONDS = 1.0
+_MAX_RETRIES = 5
+_INITIAL_BACKOFF_SECONDS = 2.0
 
 
 class LLMCallError(Exception):
@@ -33,9 +33,9 @@ def _api_key() -> str:
     except ImportError:
         pass
     
-    key = os.environ.get("GROQ_API_KEY")
+    key = os.environ.get("GEMINI_API_KEY")
     if not key:
-        raise EnvironmentError("GROQ_API_KEY is not set.")
+        raise EnvironmentError("GEMINI_API_KEY is not set.")
     return key
 
 
@@ -56,24 +56,27 @@ def _parse_json(raw_text: str) -> dict:
 
 
 def _transient(exc: Exception) -> bool:
-    if isinstance(exc, (groq.RateLimitError, groq.APIConnectionError, groq.InternalServerError)):
+    err_str = str(exc).lower()
+    if "rate" in err_str or "quota" in err_str or "500" in err_str or "503" in err_str:
         return True
     return False
 
 async def call_json_async(prompt: str) -> dict:
-    """Call Groq asynchronously, parse JSON, retry transient errors twice."""
-    client = AsyncGroq(api_key=_api_key())
+    """Call Gemini asynchronously, parse JSON, retry transient errors twice."""
+    client = genai.Client(api_key=_api_key())
     last_error: Optional[Exception] = None
 
     for attempt in range(_MAX_RETRIES + 1):
         try:
-            response = await client.chat.completions.create(
-                model=OPENAI_MODEL,
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"},
-                temperature=0.2,
+            response = await client.aio.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.2,
+                )
             )
-            text = response.choices[0].message.content
+            text = response.text
             if not text:
                 raise LLMCallError("Empty response.")
             return _parse_json(text)
@@ -83,12 +86,12 @@ async def call_json_async(prompt: str) -> dict:
             last_error = exc
             if attempt < _MAX_RETRIES and _transient(exc):
                 backoff = _INITIAL_BACKOFF_SECONDS * (2**attempt)
-                logger.warning("Groq transient error, retry in %.1fs: %s", backoff, exc)
+                logger.warning("Gemini transient error, retry in %.1fs: %s", backoff, exc)
                 await asyncio.sleep(backoff)
                 continue
-            raise LLMCallError(f"Groq call failed: {exc}", raw_response=str(exc)) from exc
+            raise LLMCallError(f"Gemini call failed: {exc}", raw_response=str(exc)) from exc
 
-    raise LLMCallError(f"Groq call failed after retries: {last_error}", raw_response=str(last_error))
+    raise LLMCallError(f"Gemini call failed after retries: {last_error}", raw_response=str(last_error))
 
 
 def call_json(prompt: str) -> dict:

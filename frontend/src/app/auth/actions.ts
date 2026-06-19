@@ -113,3 +113,14 @@ export async function signupOrganizer(formData: FormData) {
   revalidatePath('/', 'layout')
   redirect('/organizer/dashboard')
 }
+
+export async function signOut() {
+  const supabase = await createClient()
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    return redirect('/')
+  }
+  
+  await supabase.auth.signOut()
+  revalidatePath('/', 'layout')
+  redirect('/')
+}

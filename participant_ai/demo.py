@@ -10,7 +10,7 @@ from participant_ai.db import init_db
 from participant_ai.pipelines.problem_statement.parser import parse_ps
 from participant_ai.pipelines.resume_rag.parser import parse_and_vectorize_batch
 from participant_ai.core.schemas import Participant, Team
-from participant_ai.pipelines.team_formation.formation import diversity_score, form_teams, suggest_team, team_vector
+from participant_ai.pipelines.team_formation.formation import coverage_score, form_teams, suggest_team, team_vector
 
 PROBLEM_STATEMENTS: list[dict[str, Any]] = [
     {
@@ -87,11 +87,12 @@ async def _build_participants() -> list[Participant]:
     triplets = await parse_and_vectorize_batch(texts, max_concurrency=1)
     
     participants = []
-    for meta, (parsed, vector, breakdown) in zip(RESUMES, triplets):
+    for meta, (parsed, vector, embedding, breakdown) in zip(RESUMES, triplets):
         p = Participant(
             id=meta["id"],
             parsed_resume=parsed,
             skill_vector=vector,
+            semantic_embedding=embedding,
         )
         setattr(p, "_breakdown", breakdown)
         participants.append(p)
@@ -99,13 +100,14 @@ async def _build_participants() -> list[Participant]:
 
 
 async def _build_late_joiner() -> Participant:
-    parsed, vector, breakdown = (await parse_and_vectorize_batch(
+    parsed, vector, embedding, breakdown = (await parse_and_vectorize_batch(
         [LATE_JOINER["text"]], max_concurrency=1
     ))[0]
     return Participant(
         id=LATE_JOINER["id"],
         parsed_resume=parsed,
         skill_vector=vector,
+        semantic_embedding=embedding,
     )
 
 
@@ -131,17 +133,27 @@ def main() -> None:
             b = breakdown.get(cat, {})
             print(f"  {cat}: keyword={b.get('keyword', 0):.2f} project={b.get('project', 0):.2f} llm={b.get('llm', 0):.2f} -> final={b.get('final', 0):.2f}")
 
-    print("\n=== Form teams (pure math, diversity maximized) ===\n")
-    formation = form_teams(participants, team_size=4, num_teams=2)
+    print("\n=== Form teams (Coverage-Driven Assembly) ===\n")
+    # For the demo, use the first two problem statements
+    requirements = ps_list[:2]
+    # Set max team size to 4 for demo
+    for req in requirements:
+        req.team_size = 4
+        
+    formation = form_teams(participants, requirements)
     teams = formation["teams"]
+    
+    team_reqs = {req.title: req.required_vector for req in requirements}
 
     for team in teams:
         members = [p for p in participants if p.id in team.member_ids]
         team_vec = team_vector([m.skill_vector for m in members])
-        score = diversity_score(team_vec)
+        ps_title = team.name.replace("Team ", "")
+        req_vec = team_reqs.get(ps_title, team_vec) # fallback
+        score = coverage_score(team_vec, req_vec)
         print(f"Team {team.team_id[:8]}... | {team.name}")
         print(f"  Members: {team.member_ids}")
-        print(f"  Diversity Score: {score:.3f} | Slots left: {team.slots_remaining}\n")
+        print(f"  Coverage Score: {score:.3f} | Slots left: {team.slots_remaining}\n")
 
     print("\nLog:")
     for line in formation["log"]:
@@ -156,10 +168,13 @@ def main() -> None:
     for t in teams:
         all_members[t.team_id] = [p for p in participants if p.id in t.member_ids]
         
+    team_reqs_by_id = {t.team_id: team_reqs.get(t.name.replace("Team ", "")) for t in teams}
+        
     suggestion = suggest_team(
         late_joiner,
         open_teams=teams,
         all_members=all_members,
+        team_reqs=team_reqs_by_id,
     )
     if suggestion:
         print(f"{late_joiner.id} -> Team({suggestion.name}) [{suggestion.team_id[:8]}...]")

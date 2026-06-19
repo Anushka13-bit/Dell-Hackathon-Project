@@ -2,17 +2,18 @@
 
 import { useOnboardingStore } from "@/store/useOnboardingStore";
 import StepWrapper from "@/components/onboarding/StepWrapper";
-import { ArrowRight, GraduationCap, BookOpen, Calendar } from "lucide-react";
+import { ArrowRight, GraduationCap, BookOpen, Calendar, User } from "lucide-react";
 import { useState } from "react";
 
-export default function Step5Profile() {
-  const { collegeInfo, links, updateData, nextStep } = useOnboardingStore();
+export default function Step2Profile() {
+  const { fullName, collegeInfo, links, updateData, nextStep } = useOnboardingStore();
+  const [localName, setLocalName] = useState(fullName);
   const [localCollege, setLocalCollege] = useState(collegeInfo);
   const [localLinks, setLocalLinks] = useState(links);
 
   const handleContinue = (e: React.FormEvent) => {
     e.preventDefault();
-    updateData({ collegeInfo: localCollege, links: localLinks });
+    updateData({ fullName: localName.trim(), collegeInfo: localCollege, links: localLinks });
     nextStep();
   };
 
@@ -24,6 +25,27 @@ export default function Step5Profile() {
       </div>
 
       <form onSubmit={handleContinue} className="space-y-4">
+        {/* Name Details */}
+        <div className="space-y-4">
+          <h3 className="text-[14px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Identity</h3>
+          <div className="relative group">
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/50 group-focus-within:text-primary transition-colors" />
+            <input 
+              type="text" 
+              placeholder="Full Name" 
+              required
+              value={localName}
+              onChange={(e) => setLocalName(e.target.value)}
+              className="w-full pl-12 pr-4 py-3.5 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-[15px]"
+              autoFocus
+            />
+          </div>
+        </div>
+
+        <div className="pt-2 pb-2">
+          <div className="w-full border-t border-outline-variant/20"></div>
+        </div>
+
         {/* College Details */}
         <div className="space-y-4">
           <h3 className="text-[14px] font-bold text-on-surface-variant uppercase tracking-wider mb-2">Education</h3>

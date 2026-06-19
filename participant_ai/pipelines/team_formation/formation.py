@@ -1,4 +1,4 @@
-"""Team formation — pure math, no LLM. Importable without GEMINI_API_KEY."""
+"""Team formation — Coverage-Driven Assembly. Importable without GEMINI_API_KEY."""
 
 from __future__ import annotations
 
@@ -13,13 +13,7 @@ MIN_IMPROVEMENT = 0.05
 
 
 def team_vector(member_vectors: list[SkillVector]) -> SkillVector:
-    """Element-wise MAX across members, not average.
-
-    A team's strength in a domain is its strongest member, not diluted by weaker
-    ones. This makes greedy formation naturally diversify: a 2nd ML-heavy person
-    adds ~0 once one ML-strong member already maxes that category, so the
-    algorithm prefers whoever closes a different gap instead.
-    """
+    """Element-wise MAX across members, not average."""
     if not member_vectors:
         return SkillVector()
     valid_categories = category_names()
@@ -30,37 +24,46 @@ def team_vector(member_vectors: list[SkillVector]) -> SkillVector:
     return SkillVector.from_dict(aggregated)
 
 
-def diversity_score(team_vec: SkillVector) -> float:
-    """Average of the element-wise maximums across all 9 skills. Range [0, 1].
-    
-    A perfectly diverse team has 1.0 in every single skill category.
+def coverage_score(team_vec: SkillVector, required_vec: SkillVector) -> float:
+    """Coverage-Driven Assembly (PRD Section 10.4).
+    coverage_score = sum(min(team_skill, required_skill)) / sum(required_skill)
     """
     valid_categories = category_names()
-    return sum(team_vec.scores.get(c, 0.0) for c in valid_categories) / len(valid_categories)
+    sum_required = sum(required_vec.scores.get(c, 0.0) for c in valid_categories)
+    if sum_required == 0:
+        return 1.0 # If no requirements, we have 100% coverage
+        
+    sum_covered = sum(
+        min(team_vec.scores.get(c, 0.0), required_vec.scores.get(c, 0.0))
+        for c in valid_categories
+    )
+    return sum_covered / sum_required
 
 
 def _improvement(
     current_members: list[Participant],
     candidate: Participant,
+    required_vec: SkillVector,
 ) -> float:
     before_vecs = [m.skill_vector for m in current_members]
     after_vecs = before_vecs + [candidate.skill_vector]
-    return diversity_score(team_vector(after_vecs)) - diversity_score(
-        team_vector(before_vecs)
+    return coverage_score(team_vector(after_vecs), required_vec) - coverage_score(
+        team_vector(before_vecs), required_vec
     )
 
 
 def best_fit(
     candidates: list[Participant],
     current_members: list[Participant],
+    required_vec: SkillVector,
 ) -> Participant | None:
-    """Return the candidate who most improves team diversity, or None if pool is empty."""
+    """Return the candidate who most improves team coverage, or None if pool is empty."""
     if not candidates:
         return None
     best: Participant | None = None
     best_delta = float("-inf")
     for candidate in candidates:
-        delta = _improvement(current_members, candidate)
+        delta = _improvement(current_members, candidate, required_vec)
         if delta > best_delta:
             best_delta = delta
             best = candidate
@@ -75,49 +78,54 @@ def _assign(
     team: Team,
     participant: Participant,
     members: list[Participant],
+    required_vec: SkillVector,
     log: list[str],
 ) -> None:
-    before = diversity_score(team_vector([m.skill_vector for m in members]))
+    before = coverage_score(team_vector([m.skill_vector for m in members]), required_vec)
     team.member_ids.append(participant.id)
     team.slots_remaining = max(0, team.slots_remaining - 1)
     members.append(participant)
-    after = diversity_score(team_vector([m.skill_vector for m in members]))
+    after = coverage_score(team_vector([m.skill_vector for m in members]), required_vec)
     domain = participant.skill_vector.dominant(top_n=1)[0]
     log.append(
-        f"{participant.id} -> Team({team.name}): dominant {domain}, {before:.2f}->{after:.2f}"
+        f"{participant.id} -> Team({team.name}): dominant {domain}, coverage {before:.2f}->{after:.2f}"
     )
 
 
-def form_teams(unassigned: list[Participant], team_size: int, num_teams: int) -> dict:
-    """Greedy team formation optimizing purely for internal team skill diversity.
-
-    Caller fetches unassigned pool with one DB query, calls this in memory,
-    then batch-writes results. Never touches Gemini or the DB itself.
+def form_teams(unassigned: list[Participant], requirements: list[PSRequirement]) -> dict:
+    """Coverage-Driven Team Assembly (PRD 10.5).
+    
+    Creates one team per PSRequirement, and fills it from the unassigned pool
+    by greedily maximizing coverage for that specific PS's skill requirements.
     """
     pool: list[Participant] = list(unassigned)
     all_by_id = {p.id: p for p in pool}
     teams: list[Team] = []
     log: list[str] = []
+    
+    # Track the required_vec for each team by team_id
+    team_reqs: dict[str, SkillVector] = {}
 
-    for i in range(num_teams):
+    for req in requirements:
         team = Team(
             team_id=str(uuid.uuid4()),
-            name=f"Team {i + 1}",
+            name=f"Team {req.title}",
             member_ids=[],
-            slots_remaining=team_size,
+            slots_remaining=req.team_size,
         )
         teams.append(team)
+        team_reqs[team.team_id] = req.required_vector
         members: list[Participant] = []
 
         while team.slots_remaining > 0 and pool:
-            pick = best_fit(pool, members)
+            pick = best_fit(pool, members, req.required_vector)
             if pick is None:
                 break
-            delta = _improvement(members, pick)
+            delta = _improvement(members, pick, req.required_vector)
             if delta < MIN_IMPROVEMENT and len(pool) > team.slots_remaining:
-                pass
+                pass # Still assign if we have slots to fill
             pool.remove(pick)
-            _assign(team, pick, members, log)
+            _assign(team, pick, members, req.required_vector, log)
 
     # Second pass: place leftovers on whichever open team they help most
     if pool:
@@ -125,22 +133,23 @@ def form_teams(unassigned: list[Participant], team_size: int, num_teams: int) ->
     changed = True
     while pool and changed:
         changed = False
-        best: Optional[tuple[Team, Participant, float, list[Participant]]] = None
+        best: Optional[tuple[Team, Participant, float, list[Participant], SkillVector]] = None
         for team in teams:
             if team.slots_remaining <= 0:
                 continue
             members = _members_for_team(team, all_by_id)
-            pick = best_fit(pool, members)
+            req_vec = team_reqs[team.team_id]
+            pick = best_fit(pool, members, req_vec)
             if pick is None:
                 continue
-            delta = _improvement(members, pick)
+            delta = _improvement(members, pick, req_vec)
             if best is None or delta > best[2]:
-                best = (team, pick, delta, members)
+                best = (team, pick, delta, members, req_vec)
 
         if best is not None and best[2] > 0:
-            team, pick, _, members = best
+            team, pick, _, members, req_vec = best
             pool.remove(pick)
-            _assign(team, pick, members, log)
+            _assign(team, pick, members, req_vec, log)
             changed = True
         else:
             if pool:
@@ -158,12 +167,9 @@ def suggest_team(
     participant: Participant,
     open_teams: list[Team],
     all_members: dict[str, list[Participant]],
+    team_reqs: dict[str, SkillVector],
 ) -> Team | None:
-    """Suggest best open team for one incoming participant (incremental registration).
-
-    Returns None if no team clears MIN_IMPROVEMENT — caller falls back to batch formation.
-    Scores are always relative to one team's gap; no global participant ranking.
-    """
+    """Suggest best open team for one incoming participant."""
     best_team: Team | None = None
     best_delta = MIN_IMPROVEMENT
 
@@ -171,7 +177,11 @@ def suggest_team(
         if team.slots_remaining <= 0:
             continue
         members = all_members.get(team.team_id, [])
-        delta = _improvement(members, participant)
+        req_vec = team_reqs.get(team.team_id)
+        if not req_vec:
+            continue
+            
+        delta = _improvement(members, participant, req_vec)
         if delta > best_delta:
             best_delta = delta
             best_team = team
