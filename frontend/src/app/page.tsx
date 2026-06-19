@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function LandingPage() {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [showRoleModal, setShowRoleModal] = useState(false);
 
   useEffect(() => {
     const target = new Date("2024-12-31T23:59:59").getTime();
@@ -65,7 +66,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-6">
             <Link href="/auth/participant" className="hidden md:block text-on-surface-variant hover:text-primary transition-colors text-body-md font-medium">Participant Login</Link>
             <Link href="/auth/organizer">
-              <button className="bg-tertiary text-white px-6 py-2.5 rounded-xl font-label-md hover:opacity-90 transition-all duration-300 shadow-sm hover:shadow-md">
+              <button className="bg-[rgb(73,99,95)] text-white px-6 py-2.5 rounded-xl font-label-md hover:bg-[rgb(63,89,85)] transition-all duration-300 shadow-sm hover:shadow-md">
                 Organizer Login
               </button>
             </Link>
@@ -116,17 +117,13 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.4 }}
-              className="flex flex-col md:flex-row items-center justify-center gap-4 mt-8">
-              <Link href="/auth/participant">
-                <button className="bg-primary text-white px-10 py-4 rounded-full font-bold text-lg hover:shadow-xl hover:bg-primary/90 transition-all duration-300 transform hover:-translate-y-1">
-                  Participant Login
-                </button>
-              </Link>
-              <Link href="/auth/organizer">
-                <button className="bg-white text-primary border-2 border-primary/10 px-10 py-4 rounded-full font-bold text-lg hover:shadow-xl hover:border-primary/30 transition-all duration-300 transform hover:-translate-y-1">
-                  Organizer Login
-                </button>
-              </Link>
+            >
+              <button 
+                onClick={() => setShowRoleModal(true)} 
+                className="bg-primary text-white px-12 py-5 rounded-full font-bold text-xl hover:shadow-2xl hover:bg-primary/90 transition-all duration-300 transform hover:-translate-y-1"
+              >
+                Get Started
+              </button>
             </motion.div>
           </div>
         </section>
@@ -188,16 +185,58 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Final CTA */}
-        <section className="py-24 bg-surface relative overflow-hidden">
-          <div className="max-w-4xl mx-auto px-5 text-center relative z-10">
-            <div className="bg-surface-container-highest p-16 rounded-[48px] border border-outline-variant/20 shadow-2xl">
-              <h2 className="font-display-lg text-[32px] md:text-[48px] mb-6">Ready to build?</h2>
-              <p className="font-body-lg text-[18px] text-on-surface-variant mb-12">Join the thousands of organizers who have upgraded to a more sophisticated way of hacking.</p>
-              <button className="bg-primary text-white px-12 py-5 rounded-full font-label-md text-lg hover:bg-on-primary-container transition-all duration-300">Start for Free</button>
-            </div>
-          </div>
-        </section>
+        {/* Role Selection Modal */}
+        <AnimatePresence>
+          {showRoleModal && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-5"
+              onClick={() => setShowRoleModal(false)}
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-surface w-full max-w-2xl rounded-[32px] p-10 md:p-14 shadow-2xl relative border border-outline-variant/20"
+              >
+                <button 
+                  onClick={() => setShowRoleModal(false)}
+                  className="absolute top-6 right-6 w-10 h-10 rounded-full bg-surface-container hover:bg-surface-container-highest flex items-center justify-center transition-colors text-on-surface-variant"
+                >
+                  <span className="material-symbols-outlined text-xl">close</span>
+                </button>
+                
+                <h2 className="text-[32px] md:text-[40px] font-bold text-center mb-4 text-on-surface">Choose your path</h2>
+                <p className="text-center text-on-surface-variant mb-12 text-[18px]">Are you here to build something amazing, or organize the next big event?</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Link href="/auth/participant" className="group">
+                    <div className="h-full border-2 border-outline-variant/30 hover:border-primary rounded-3xl p-8 transition-all hover:bg-primary/5 hover:shadow-lg flex flex-col items-center text-center">
+                      <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <span className="material-symbols-outlined text-[40px] text-primary">code_blocks</span>
+                      </div>
+                      <h3 className="text-[24px] font-bold mb-3 text-on-surface group-hover:text-primary transition-colors">Participant</h3>
+                      <p className="text-on-surface-variant leading-relaxed">Join hackathons, form teams, and showcase your skills to the world.</p>
+                    </div>
+                  </Link>
+                  
+                  <Link href="/auth/organizer" className="group">
+                    <div className="h-full border-2 border-outline-variant/30 hover:border-[rgb(73,99,95)] rounded-3xl p-8 transition-all hover:bg-[rgb(73,99,95)]/10 hover:shadow-lg flex flex-col items-center text-center">
+                      <div className="w-20 h-20 bg-[rgb(73,99,95)]/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                        <span className="material-symbols-outlined text-[40px] text-[rgb(73,99,95)]">event_available</span>
+                      </div>
+                      <h3 className="text-[24px] font-bold mb-3 text-on-surface group-hover:text-[rgb(73,99,95)] transition-colors">Organizer</h3>
+                      <p className="text-on-surface-variant leading-relaxed">Host events, review submissions, and manage the entire hackathon lifecycle.</p>
+                    </div>
+                  </Link>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
 
       {/* Footer */}
