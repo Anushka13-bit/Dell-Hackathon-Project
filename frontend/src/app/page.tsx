@@ -61,10 +61,10 @@ export default function LandingPage() {
             <Link href="#" className="text-on-surface-variant hover:text-primary transition-colors text-body-md">Documentation</Link>
           </div>
           <div className="flex items-center gap-6">
-            <Link href="/participant/teams" className="hidden md:block text-on-surface-variant hover:text-primary transition-colors text-body-md">Sign In</Link>
-            <Link href="/organizer/dashboard">
-              <button className="bg-tertiary text-on-tertiary px-6 py-2.5 rounded-xl font-label-md hover:opacity-90 scale-95 active:scale-90 transition-all duration-300">
-                Get Started
+            <Link href="/auth/participant" className="hidden md:block text-on-surface-variant hover:text-primary transition-colors text-body-md font-medium">Participant Login</Link>
+            <Link href="/auth/organizer">
+              <button className="bg-tertiary text-white px-6 py-2.5 rounded-xl font-label-md hover:opacity-90 transition-all duration-300 shadow-sm hover:shadow-md">
+                Organizer Login
               </button>
             </Link>
           </div>
@@ -84,16 +84,17 @@ export default function LandingPage() {
             <p className="font-body-lg text-[18px] text-on-surface-variant max-w-2xl mx-auto mb-12 leading-relaxed">
               HackFlow provides a tactile, professional-grade platform for organizing world-class hackathons with ease. From registration to real-time analytics.
             </p>
-            <div className="flex flex-col md:flex-row items-center justify-center gap-6">
-              <Link href="/organizer/hackathons/create/step-1">
-                <button className="bg-tertiary text-on-tertiary px-10 py-4 rounded-3xl font-label-md text-lg hover:shadow-lg transition-all duration-300 scale-95 active:scale-90">
-                  Launch Your Event
+            <div className="flex flex-col md:flex-row items-center justify-center gap-4 mt-8">
+              <Link href="/auth/participant">
+                <button className="bg-primary text-white px-10 py-4 rounded-full font-bold text-lg hover:shadow-xl hover:bg-primary/90 transition-all duration-300 transform hover:-translate-y-1">
+                  Participant Login
                 </button>
               </Link>
-              <button className="flex items-center gap-2 text-primary font-label-md hover:underline">
-                <span className="material-symbols-outlined">play_circle</span>
-                View Showcase
-              </button>
+              <Link href="/auth/organizer">
+                <button className="bg-white text-primary border-2 border-primary/10 px-10 py-4 rounded-full font-bold text-lg hover:shadow-xl hover:border-primary/30 transition-all duration-300 transform hover:-translate-y-1">
+                  Organizer Login
+                </button>
+              </Link>
             </div>
           </div>
         </section>

@@ -12,7 +12,6 @@ export default function ParticipantTopNav() {
             <Link className="text-on-surface-variant font-label-md hover:text-primary transition-colors duration-200" href="/participant/dashboard">Dashboard</Link>
             <Link className="text-primary font-bold border-b-2 border-primary pb-1 font-body-md" href="/participant/teams">Teams</Link>
             <Link className="text-on-surface-variant font-label-md hover:text-primary transition-colors duration-200" href="/participant/challenges">Challenges</Link>
-            <Link className="text-on-surface-variant font-label-md hover:text-primary transition-colors duration-200" href="/participant/mentors">Mentors</Link>
           </div>
         </div>
         <div className="flex items-center gap-6">
