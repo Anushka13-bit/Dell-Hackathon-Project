@@ -163,7 +163,7 @@ Shows all hackathons.
 - College
 - Status
 - Duplicate Risk
-- Face Validation
+- Face Validation (mock + not storing biometric data)
 
 **Color Codes:**
 - Green = Approved
@@ -191,9 +191,7 @@ Clicking Analysis opens:
 - Show: Resume Similarity, GitHub Similarity, College Similarity
 - Organizer can override
 
-*Face Scan Failed:*
-- Status: Manual Verification Required
-- Organizer can manually approve
+*Face Scan Failed (Mocked):*
 
 ---
 
@@ -362,6 +360,7 @@ Landing Page → Login / Signup → Select Role: Participant → Participant Das
 - Name
 - College
 - Email
+- Phone (Mock OTP)
 - GitHub (Optional)
 - LinkedIn (Optional)
 - Resume Upload
@@ -372,10 +371,9 @@ Landing Page → Login / Signup → Select Role: Participant → Participant Das
 - Preview Extracted Skills
 - Edit Skills
 
-**Step 3: Face Validation**
-- Consent Required
-- Options: Validate with Camera or Skip
-- *If skipped:* Manual Review Queue
+### **Step 3: Face Validation (Mocked)**
+- Consent Required (Explicit purpose: true-person validation only)
+- Options: Validate with Camera (Mocked UI) or Skip
 
 **Step 4: Registration Pipeline (Live Progress)**
 - Resume Parsed
@@ -383,7 +381,7 @@ Landing Page → Login / Signup → Select Role: Participant → Participant Das
 - Duplicate Check
 - Validation
 - Approval
-- WebSocket Updates
+- Supabase Realtime Updates
 
 **Registration Status Screen:**
 - Approved
