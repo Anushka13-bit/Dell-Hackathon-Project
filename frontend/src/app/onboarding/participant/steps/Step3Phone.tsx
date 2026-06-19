@@ -78,7 +78,7 @@ export default function Step3Phone() {
           >
             <div className="relative group flex">
               <div className="w-20 bg-surface-container-low border border-r-0 border-outline-variant/30 rounded-l-2xl flex items-center justify-center font-bold text-on-surface-variant">
-                +1
+                +91
               </div>
               <div className="relative flex-1">
                 <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/50 group-focus-within:text-primary transition-colors" />
