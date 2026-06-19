@@ -21,7 +21,7 @@
 - **Gamified Leaderboards**: Real-time evaluation countdowns and reviewer consistency ranks.
 - Skill-vector coverage optimization for team formation
 
-**Tech Stack:** React + TypeScript + Tailwind (frontend), FastAPI + Python (backend), PostgreSQL + pgvector (data), sentence-transformers + Gemini Flash (AI), MediaPipe/OpenCV for local liveness validation, Redis (caching/queuing), WebSockets (real-time).
+**Tech Stack:** React + TypeScript + Tailwind (frontend), Supabase (PostgreSQL + pgvector, Auth, Edge Functions) + Python (AI microservice), sentence-transformers + Gemini Flash (AI), Mocked data (for FaceScan liveness validation), WebSockets (real-time via Supabase Realtime).
 
 ---
 
@@ -134,13 +134,6 @@ Reading the judging criteria (§8.2) carefully reveals the scoring hierarchy:
 **Success Metric:** Receives only projects in her domain. Conflict check happens automatically. Rubric is clear and consistent.  
 **Technical Comfort:** High. Will notice if the bias detection methodology is statistically sound or fabricated.
 
-### 4.4 Mentor
-
-**Name:** Rahul — Senior SDE at a product company  
-**Goals:** Provide timely guidance to teams that match his expertise. Avoid being overwhelmed by too many requests.  
-**Pain Points:** In past hackathons, got pinged by 20+ teams even though he only knows backend systems.  
-**Success Metric:** Only matched to teams working on relevant problem statements. Can see which teams haven't had mentor contact and proactively reach out.
-
 ---
 
 ## 5. Functional Requirements
@@ -152,7 +145,7 @@ Reading the judging criteria (§8.2) carefully reveals the scoring hierarchy:
 | FR-A01 | Admin creates hackathon with: name, theme, start/end dates, submission deadline, team size constraints | P0 | Core data model |
 | FR-A02 | Admin adds problem statements with domain tags and required skill coverage profile | P0 | Used by team formation + reviewer matching |
 | FR-A03 | Admin configures evaluation rubric: criteria names, weights, score ranges | P0 | Must sum to 100% |
-| FR-A04 | Admin invites reviewers and mentors by email with role assignment | P0 | — |
+| FR-A04 | Admin invites reviewers by email with role assignment | P0 | — |
 | FR-A05 | Admin views registration queue with duplicate/fraud risk scores, FaceScan status, approves/rejects flagged registrations | P0 | Human-in-the-loop for duplicate and person-validation cases |
 | FR-A06 | Admin triggers reviewer assignment and sees cost breakdown (expertise match, workload balance, conflicts) | P0 | Core demo moment |
 | FR-A07 | Admin views live bias monitoring dashboard with statistical alerts | P0 | Core demo moment |
@@ -240,7 +233,6 @@ Admin Dashboard → "Create Hackathon"
   
 [Step 4: Invite Team]
   Add reviewer emails with expertise domains
-  Add mentor emails with specializations
   → POST /api/v1/hackathons/{id}/team
   
 [Step 5: Publish]
@@ -678,10 +670,6 @@ match_score = (
 
 - Shared IP subnet (same /24 network): conflict_score = 0.7 — potential cohabitation
 
-- Prior mentor-mentee relationship in same hackathon: conflict_score = 0.5
-
-- GitHub collaborators (co-committed repositories): conflict_score = 0.3
-
 - If any conflict signal detected: cost[i][j] = 1.0 (effectively excluded from assignment)
 
 ### 11.4 Assignment Algorithm
@@ -894,7 +882,7 @@ confidence = (ci_upper - ci_lower) / final_score  # lower = higher confidence
 |email|VARCHAR(255)|UNIQUE, NOT NULL, AES-256 encrypted|Login identifier|
 |email_hash|CHAR(64)|UNIQUE, indexed|SHA-256 for lookups without decryption|
 |password_hash|VARCHAR(255)|NOT NULL, bcrypt rounds=12|Argon2id hash|
-|role|ENUM|NOT NULL, CHECK IN (admin,participant,reviewer,mentor)|RBAC role|
+|role|ENUM|NOT NULL, CHECK IN (admin,participant,reviewer)|RBAC role|
 |name_encrypted|TEXT|AES-256|Full name, encrypted|
 |phone_hash|CHAR(64)|UNIQUE, nullable|Phone SHA-256 for dedup|
 |is_active|BOOLEAN|DEFAULT true|Soft delete flag|
@@ -1172,17 +1160,14 @@ The system is designed as a modular monolith (for 3-day development feasibility)
 
 |Layer|Technology|Configuration Notes|
 |---|---|---|
-|API Gateway|Nginx + Uvicorn|Rate limiting, SSL termination, WebSocket proxy_pass, upstream keepalive 1000|
-|Backend Framework|FastAPI (Python 3.11+)|Async handlers, asyncpg connection pool (pool_size=20), Pydantic v2 models|
-|Task Queue|Celery 5 + Redis 7|Separate queues: high-priority (registration), low-priority (analytics)|
-|Primary Database|PostgreSQL 15 + pgvector 0.5|Max connections: 200; connection pooling via PgBouncer (pool_size=50)|
-|Cache / Pub-Sub|Redis 7|Token blacklist, job results cache, WebSocket pub-sub channels|
-|Frontend|React 18 + TypeScript + Tailwind 3|Vite build, React Query for data fetching, Zustand for state management|
-|Real-time|FastAPI WebSockets + Redis pub-sub|All real-time updates flow through Redis channels; WS handlers are subscribers|
-|AI Models|SentenceTransformer (local) + Gemini API|Model loaded once per Celery worker; Gemini: exponential backoff, circuit breaker|
-|Containerization|Docker 24 + Docker Compose|Separate containers: api, celery-worker-high, celery-worker-low, celery-beat, redis, postgres, nginx|
-|Storage|Local volume (dev) / S3-compatible (prod)|Resume PDFs and pitch decks; FaceScan frames are transient and not retained|
-|Monitoring|Structlog + Prometheus metrics endpoint|Request latency, queue depth, AI pipeline stage timing, error rates|
+|Backend Services|Supabase|Handles PostgreSQL DB, pgvector, Authentication, and Edge Functions|
+|Primary Database|Supabase PostgreSQL + pgvector|Stores user data, embeddings, and hackathon state natively|
+|AI / Worker Microservice|Python (FastAPI) or Supabase Edge Functions|Handles Gemini API calls, SentenceTransformers, and Assignment algorithms|
+|Frontend|React 18 + TypeScript + Tailwind 3|Vite build, Supabase Client, Zustand for state management|
+|Real-time|Supabase Realtime|Native Postgres change data capture and broadcast to clients|
+|AI Models|SentenceTransformer (local) + Gemini API|Used for deduplication, skill vector mapping, and feedback generation|
+|Storage|Supabase Storage|Used for uploading Resume PDFs and pitch decks|
+|FaceScan|Mocked UI Component|Mocked webcam interface returning predefined validation states|
 
 ## 19. Event Flows
 
@@ -1308,7 +1293,7 @@ Reviewer   FastAPI   Bias Service   scipy.stats   Redis Pub/Sub   Admin WS
 
 - Token blacklist: Redis SET with TTL matching token expiry; checked on every request
 
-- RBAC middleware: FastAPI dependency injected per-route; roles: admin, participant, reviewer, mentor
+- RBAC middleware: FastAPI dependency injected per-route; roles: admin, participant, reviewer
 
 - Resource ownership checks: participant can only access their own registration/team/submission
 
@@ -1528,103 +1513,68 @@ Worker pools:
 |Innovation|Automation coverage|> 60% of lifecycle steps automated|Feature audit against lifecycle checklist|
 |Demo|Metrics demonstrable in presentation|> 60% of KPIs|Live demo test run on mock data|
 
-## 26. 3-Day Implementation Roadmap
+## 26. 3-Day Implementation Roadmap (5-Member Team)
 
-Adjusted for a 3-day development window — prioritize working demos over perfect polish. Build the P0 path end-to-end first: registration + FaceScan validation, duplicate analysis, team/reviewer assignment, bias detection, hash-chain audit, results, and Promotion AI. Analytics, chatbot, appeals, and forecasting are demo-depth unless time remains.
+Adjusted for a 3-day development window — prioritize working demos over perfect polish. We will leverage Supabase to rapidly accelerate MVP development. **Team Structure: 3 Backend/AI (B1, B2, B3) and 2 Frontend (F1, F2).**
 
 ### Day 1: Foundation + Registration AI (Hours 1-15)
 
-#### Hours 1-4: Project Setup
+#### Project Setup & Infrastructure (Hours 1-4)
+- **B1 (Lead Backend):** Initialize Supabase project. Configure Auth, Database schemas (from Section 15), and apply RLS (Row Level Security) policies.
+- **B2 (AI Engineer):** Set up Python AI microservice (or Edge Functions). Initialize `all-MiniLM-L6-v2` SentenceTransformer and pgvector indexes in Supabase.
+- **F1 (Lead Frontend):** Scaffold React + Vite app with Tailwind. Integrate Supabase Client, Auth flows, and routing.
+- **F2 (UI Focus):** Build base layouts (Admin/Participant) and start the Registration Form UI.
 
-- Initialize: FastAPI app, PostgreSQL + pgvector, Redis, Docker Compose, React + Vite
+#### Registration Intelligence (Hours 5-10)
+- **B3 (Data/Logic):** Build duplicate detection logic (Stage 1 & 2: exact + RapidFuzz). Handle resume upload triggers.
+- **B2:** Implement Gemini resume parsing and embedding generation (Stage 3).
+- **F2:** Complete Registration Form with **Mock FaceScan UI** (simulates camera validation and returns preset validation state to save MVP time).
+- **F1:** Implement real-time registration status spinner via Supabase Realtime.
 
-- Database: apply all migrations (schema from Section 15); seed mock data script
-
-- Auth: JWT RS256 login, registration, RBAC middleware; 4 user roles working
-
-- Admin: create hackathon form with full config (name, theme, PS, criteria, dates, team sizes)
-
-#### Hours 5-10: Registration Intelligence
-
-- Registration form: all fields + resume PDF upload; phone OTP (mock SMS service); optional FaceScan consent and webcam challenge
-
-- Celery pipeline: Stage 1 (Gemini resume parse) + Stage 2 (SentenceTransformer embeddings) + Stage 3 (pgvector ANN dedup)
-
-- FaceScan validation: client-assisted liveness/personhood check using face-present + blink/head-turn challenge; store only status and score
-
-- WebSocket progress events: client shows live pipeline stages with spinner
-
-- Admin review queue: flagged registrations with similarity breakdown explanation and separate FaceScan status
-
-#### Hours 11-15: Skill Vectors + Basic Team Formation
-
-- Gemini skill vector generation on registration approval
-
-- Team browse page: create/join teams; show coverage score + skill radar chart per team
-
-- Team recommendations: ranked by gap-fill score using participant embedding vs team coverage gap
+#### Skill Vectors + Basic Team Formation (Hours 11-15)
+- **B2:** Gemini skill vector mapping and storage.
+- **B3:** Create database functions for fetching team skill coverage gaps.
+- **F2:** Build Team Browse page with skill radar charts.
+- **F1:** Implement Admin Review Queue for flagged registrations.
 
 ### Day 2: AI Modules (Hours 16-30)
 
-#### Hours 16-20: Auto Team Formation + Submission
+#### Auto Team Formation + Submission (Hours 16-20)
+- **B1:** Setup Supabase Storage for pitch/idea uploads. Add Idea Submission DB endpoints.
+- **B2:** Implement Greedy coverage optimizer and diversity scoring logic for auto-formation.
+- **B3:** Implement Admin trigger function to auto-form teams.
+- **F1:** Build Admin Hackathon Configuration flow (theme, rubric, dates).
+- **F2:** Build Idea Submission UI and Team Management interactions.
 
-- Auto-formation Celery task: greedy coverage optimizer + diversity scoring
+#### Reviewer Intelligence + Evaluation (Hours 21-26)
+- **B1:** Setup Hash-chain audit trigger directly in Supabase Postgres.
+- **B2:** Build Reviewer Assignment Engine (cost matrix + scipy Hungarian solver).
+- **B3:** Implement Real-time Bias Detection (Z-score outlier check) reacting to new score inserts.
+- **F1:** Build Reviewer Dashboard (assignments, rubrics). Build Admin Assignment view (AI vs Random diff).
+- **F2:** Build Evaluation Sliders/Comments UI and Admin Bias Alert toasts.
 
-- Admin trigger: 'Form Teams Now' button + scheduled 3h before hackathon start
-
-- Idea submission form: title, description, tech stack, pitch PDF upload
-
-- Gemini idea categorization + duplicate idea detection
-
-#### Hours 21-26: Reviewer Intelligence + Evaluation
-
-- Reviewer assignment engine: embedding similarity + multi-objective cost matrix + scipy Hungarian solver
-
-- Conflict detection: org affiliation + IP subnet check
-
-- Evaluation UI: reviewer sees assigned projects, scores criteria via sliders, adds comments
-
-- Real-time bias detection: Z-score outlier check on every score submission; admin WebSocket alert
-
-#### Hours 27-30: Results Engine + Audit Trail
-
-- Results computation: Z-normalization + weighted aggregation + bootstrap CI + tie-breaking
-
-- Gemini personalized feedback generation: batch of all teams
-
-- Hash-chain audit log: implement insert-only trigger + hash computation on every state change
-
-- Results publication: WebSocket broadcast to all participants
+#### Results Engine + Audit Trail (Hours 27-30)
+- **B1:** Build Results Aggregation logic (weighted average, CI, tie-breakers).
+- **B2:** Implement batch Gemini NLG personalized feedback generation.
+- **B3:** Secure audit log verification endpoints.
+- **F1:** Build Results Leaderboard view.
 
 ### Day 3: Communication + Analytics + Polish (Hours 31-45)
 
-#### Hours 31-35: Communication AI + Promotion AI
+#### Communication AI + Promotion AI (Hours 31-35)
+- **B1:** Implement basic reminder notifications via Edge Functions or chron.
+- **B2:** Build RAG Chatbot (pgvector retrieval + Gemini text generation) and Promotion AI (marketing copy generator).
+- **F2:** Build RAG Chatbot floating widget and Promotion AI Admin view.
 
-- RAG chatbot: knowledge base ingestion from hackathon config; pgvector retrieval + Gemini generation + WS streaming
+#### Analytics Dashboard + Appeal Flow (Hours 36-40)
+- **B3:** Create SQL Views/Functions for aggregated hackathon analytics.
+- **F1:** Build Admin Analytics Dashboard (Recharts: funnel, heatmap, completions).
+- **F2:** Implement Appeal submission form UI.
 
-- Scheduled reminders: Celery beat T-24h and T-2h deadline reminders for unsubmitted teams
-
-- Promotion AI: Gemini generates email + LinkedIn + X/Twitter + WhatsApp content from hackathon details; admin can edit, save variants, and mock-send
-
-#### Hours 36-40: Analytics Dashboard + Appeal Flow
-
-- Admin analytics dashboard: Recharts charts for registration funnel, skill heatmap, bias alerts, reviewer completion
-
-- Real-time dashboard WebSocket: live registration counter, submission count, alert badge
-
-- Appeal submission form: participant explains dispute, selects affected criteria; admin review queue
-
-#### Hours 41-45: Polish + Demo Prep
-
-- UI/UX polish: responsive design, loading states, error boundaries, empty states
-
-- Mock data generation script: 50 participants (diverse skills/colleges), 10 reviewers, 15 submissions, injected bias patterns
-
-- Docker Compose deployment on cloud VM (render.com free tier or Fly.io)
-
-- Documentation: README with setup, API docs (FastAPI auto-generated at /docs), architecture diagram
-
-- Demo script: 10-minute walkthrough covering all evaluation criteria with live AI demonstrations
+#### Polish + Demo Prep (Hours 41-45)
+- **Team (All):** Complete UI/UX polish, handle empty states and error boundaries.
+- **B1/B3:** Generate Mock Data (50 participants, reviewers, submissions) and inject intentional bias patterns to demonstrate the dashboard.
+- **F1/F2:** Prepare 10-minute demo script and rehearse.
 
 ### 26.2 Feature Priority Matrix
 
