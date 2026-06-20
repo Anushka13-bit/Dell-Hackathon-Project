@@ -64,9 +64,9 @@ export default function Step1Resume() {
         setUploadText("Magic complete!");
         setTimeout(() => nextStep(), 1000);
         
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to process resume:", error);
-        alert("Failed to auto-fill. Please ensure the backend is running and valid GEMINI_API_KEY is set.");
+        alert(`Failed to parse resume: ${error.message || "Please ensure the file is a valid PDF and the backend is running."}`);
         setIsUploading(false);
         setUploadText("Magic Resume Auto-Fill");
     }

@@ -3,9 +3,11 @@ export const revalidate = 0;
 
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
-import { Globe, Briefcase, Mail, Phone, GraduationCap, MapPin, Sparkles } from "lucide-react";
+import { Globe, Briefcase, Mail, Phone, GraduationCap, MapPin, Sparkles, User } from "lucide-react";
 import Link from "next/link";
+import { QuickProfileCreator } from "@/components/profile/QuickProfileCreator";
 import { SkillExtractionStatus } from "@/components/profile/SkillExtractionStatus";
+
 export default async function ParticipantProfile() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -28,12 +30,23 @@ export default async function ParticipantProfile() {
           <span className="material-symbols-outlined text-[40px]">person_off</span>
         </div>
         <h1 className="text-[24px] font-bold text-on-surface mb-2">Profile Not Found</h1>
-        <p className="text-on-surface-variant mb-6">You haven't completed the onboarding process yet.</p>
+        <p className="text-on-surface-variant mb-6 text-center max-w-md">
+          You haven't completed the onboarding process yet. You can complete the full onboarding, or instantly generate a profile from your resume below.
+        </p>
+        
         <Link href="/onboarding/participant">
-          <button className="bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primary/90 transition-colors">
-            Complete Onboarding
+          <button className="bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primary/90 transition-colors w-full max-w-md">
+            Complete Full Onboarding
           </button>
         </Link>
+
+        <div className="flex items-center gap-4 w-full max-w-md my-6">
+            <div className="h-px bg-outline-variant/30 flex-1"></div>
+            <span className="text-on-surface-variant text-[13px] font-bold uppercase tracking-widest">OR</span>
+            <div className="h-px bg-outline-variant/30 flex-1"></div>
+        </div>
+
+        <QuickProfileCreator />
       </div>
     );
   }
@@ -49,6 +62,7 @@ export default async function ParticipantProfile() {
       } else {
         // If it's a map {"React": 0.9}
         topSkills = Object.entries(profile.skill_vector)
+          .filter((a: any) => a[1] > 0)
           .sort((a: any, b: any) => b[1] - a[1])
           .slice(0, 10) as [string, number][];
       }
@@ -90,6 +104,12 @@ export default async function ParticipantProfile() {
                 <div className="flex items-center gap-3 text-on-surface-variant">
                   <Mail className="w-5 h-5 text-primary/60" />
                   <span className="text-[14px] font-medium">{profile.email}</span>
+                </div>
+              )}
+              {profile.gender && (
+                <div className="flex items-center gap-3 text-on-surface-variant">
+                  <User className="w-5 h-5 text-primary/60" />
+                  <span className="text-[14px] font-medium">{profile.gender}</span>
                 </div>
               )}
               {profile.phone && (
@@ -151,41 +171,52 @@ export default async function ParticipantProfile() {
               These skills were automatically extracted and mapped from your provided resume. They are used to match you with hackathons and teammates.
             </p>
 
-            <div className="space-y-4 relative z-10">
-              {topSkills.length > 0 ? (
-                topSkills.map(([skill, weight]) => (
-                  <div key={skill} className="flex items-center gap-4">
-                    <div className="w-32 shrink-0 font-bold text-[13px] uppercase tracking-wider text-on-surface-variant">
-                      {skill.replace('_', ' ')}
-                    </div>
-                    <div className="flex-1 h-3 bg-surface-container-high rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary rounded-full transition-all duration-1000"
-                        style={{ width: `${weight * 100}%` }}
-                      />
-                    </div>
-                    <div className="w-10 text-right font-bold text-[13px] text-primary">
-                      {Math.round(weight * 100)}%
-                    </div>
+            <div className="space-y-6 relative z-10">
+              {/* Show extracted parsed skills first */}
+              {profile.declared_skills && profile.declared_skills.length > 0 ? (
+                <div>
+                  <h4 className="text-[12px] uppercase tracking-widest font-bold text-on-surface-variant mb-3">Extracted Skills</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {profile.declared_skills.map((skill: string, index: number) => (
+                      <span key={index} className="px-3 py-1.5 bg-primary/10 text-primary text-[13px] font-bold rounded-lg border border-primary/20">
+                        {skill}
+                      </span>
+                    ))}
                   </div>
-                ))
-              ) : (
+                </div>
+              ) : null}
+
+              {/* Show AI categorization below */}
+              {topSkills.length > 0 ? (
+                <div className="pt-4 border-t border-outline-variant/20">
+                  <h4 className="text-[12px] uppercase tracking-widest font-bold text-on-surface-variant mb-4">AI Category Matching</h4>
+                  <div className="space-y-4">
+                    {topSkills.map(([skill, weight]) => (
+                      <div key={skill} className="flex items-center gap-4">
+                        <div className="w-32 shrink-0 font-bold text-[13px] uppercase tracking-wider text-on-surface-variant">
+                          {skill.replace('_', ' ')}
+                        </div>
+                        <div className="flex-1 h-3 bg-surface-container-high rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary rounded-full transition-all duration-1000"
+                            style={{ width: `${weight * 100}%` }}
+                          />
+                        </div>
+                        <div className="w-10 text-right font-bold text-[13px] text-primary">
+                          {Math.round(weight * 100)}%
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : profile.skill_vector?.status === 'processing' ? (
                 <SkillExtractionStatus userId={profile.user_id} />
+              ) : (
+                !profile.declared_skills?.length && (
+                  <div className="text-on-surface-variant text-[14px] italic">No skills listed or extracted.</div>
+                )
               )}
             </div>
-            
-            {profile.declared_skills && profile.declared_skills.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-outline-variant/20 relative z-10">
-                <h4 className="text-[12px] uppercase tracking-widest font-bold text-on-surface-variant mb-3">Raw Extracted Terms</h4>
-                <div className="flex flex-wrap gap-2">
-                  {profile.declared_skills.map((skill: string, index: number) => (
-                    <span key={index} className="px-3 py-1 bg-surface-container-low text-on-surface-variant text-[12px] font-medium rounded-lg border border-outline-variant/30">
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

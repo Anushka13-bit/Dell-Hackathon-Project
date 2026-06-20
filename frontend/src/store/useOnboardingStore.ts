@@ -28,6 +28,8 @@ export interface OnboardingState {
   emailVerified: boolean;
   phone: string;
   phoneVerified: boolean;
+  gender: string;
+  faceVerified: boolean;
   faceVerified: boolean;
   collegeInfo: {
     college: string;
@@ -57,6 +59,7 @@ const initialState = {
   emailVerified: false,
   phone: '',
   phoneVerified: false,
+  gender: '',
   faceVerified: false,
   collegeInfo: { college: '', degree: '', year: '' },
   links: { linkedin: '', github: '' },

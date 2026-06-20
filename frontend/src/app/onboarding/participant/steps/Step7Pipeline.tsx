@@ -28,12 +28,13 @@ export default function Step7Pipeline() {
 
   useEffect(() => {
     if (currentStep < pipeline.length) {
-      if (currentStep === 5 && state.aiData) { // Participant Profile Created
+      if (currentStep === 5) { // Participant Profile Created
         submitRegistration({
-          name: state.fullName,
+          name: state.fullName || "Anonymous Participant",
           email: state.email || "",
           college: state.collegeInfo.college || "N/A",
           github: state.links.github || "N/A",
+          gender: state.gender || "Prefer not to say",
           skills: state.aiData?.parsed_resume?.raw_skills || [],
           skill_vector: state.aiData?.skill_vector || {},
           raw_text: state.aiData?.raw_text || "",

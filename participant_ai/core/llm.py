@@ -1,4 +1,4 @@
-"""Thin Ollama JSON wrapper shared by pipelines."""
+"""Thin JSON wrapper shared by pipelines."""
 
 from __future__ import annotations
 
@@ -6,13 +6,14 @@ import asyncio
 import json
 import logging
 import re
+import os
 from typing import Any, Optional
-import httpx
+from groq import AsyncGroq
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_MODEL = "llama3.2"
-OLLAMA_URL = "http://localhost:11434/api/generate"
+# Using a high-performance Groq model suitable for JSON parsing
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
 _MAX_RETRIES = 3
 _INITIAL_BACKOFF_SECONDS = 2.0
@@ -47,41 +48,36 @@ def _transient(exc: Exception) -> bool:
     return False
 
 async def call_json_async(prompt: str) -> dict:
-    """Call Ollama asynchronously, parse JSON, retry transient errors."""
-    last_error: Optional[Exception] = None
+    """Call Groq asynchronously, parse JSON, retry transient errors."""
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        raise LLMCallError("GROQ_API_KEY environment variable is missing")
 
-    payload = {
-        "model": OLLAMA_MODEL,
-        "prompt": prompt,
-        "format": "json",
-        "stream": False,
-        "options": {
-            "temperature": 0.2
-        }
-    }
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            response = await client.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0.2,
+            )
+            
+            text = response.choices[0].message.content
+            if not text:
+                raise LLMCallError("Empty response.")
+            return _parse_json(text)
+        except LLMCallError:
+            raise
+        except Exception as exc:
+            last_error = exc
+            if attempt < _MAX_RETRIES and _transient(exc):
+                backoff = _INITIAL_BACKOFF_SECONDS * (2**attempt)
+                logger.warning("Transient error, retry in %.1fs: %s", backoff, exc)
+                await asyncio.sleep(backoff)
+                continue
+            raise LLMCallError(f"LLM call failed: {exc}", raw_response=str(exc)) from exc
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        for attempt in range(_MAX_RETRIES + 1):
-            try:
-                response = await client.post(OLLAMA_URL, json=payload)
-                response.raise_for_status()
-                data = response.json()
-                text = data.get("response", "")
-                if not text:
-                    raise LLMCallError("Empty response.")
-                return _parse_json(text)
-            except LLMCallError:
-                raise
-            except Exception as exc:
-                last_error = exc
-                if attempt < _MAX_RETRIES and _transient(exc):
-                    backoff = _INITIAL_BACKOFF_SECONDS * (2**attempt)
-                    logger.warning("Ollama transient error, retry in %.1fs: %s", backoff, exc)
-                    await asyncio.sleep(backoff)
-                    continue
-                raise LLMCallError(f"Ollama call failed: {exc}", raw_response=str(exc)) from exc
-
-    raise LLMCallError(f"Ollama call failed after retries: {last_error}", raw_response=str(last_error))
+    raise LLMCallError(f"LLM call failed after retries: {last_error}", raw_response=str(last_error))
 
 
 def call_json(prompt: str) -> dict:

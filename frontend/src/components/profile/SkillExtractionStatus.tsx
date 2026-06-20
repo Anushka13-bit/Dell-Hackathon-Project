@@ -24,8 +24,8 @@ export function SkillExtractionStatus({ userId }: { userId: string }) {
         },
         (payload) => {
           console.log("Realtime payload received:", payload);
-          // Check if skill_vector is populated
-          if (payload.new && payload.new.skill_vector) {
+          // Check if skill_vector is populated with actual skills (not just processing)
+          if (payload.new && payload.new.skill_vector && payload.new.skill_vector.status !== 'processing') {
             setIsProcessing(false);
             // Refresh the server component to load the new skills!
             router.refresh();

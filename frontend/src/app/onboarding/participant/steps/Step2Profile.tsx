@@ -6,14 +6,15 @@ import { ArrowRight, GraduationCap, BookOpen, Calendar, User } from "lucide-reac
 import { useState } from "react";
 
 export default function Step2Profile() {
-  const { fullName, collegeInfo, links, updateData, nextStep } = useOnboardingStore();
+  const { fullName, collegeInfo, links, gender, updateData, nextStep } = useOnboardingStore();
   const [localName, setLocalName] = useState(fullName);
+  const [localGender, setLocalGender] = useState(gender);
   const [localCollege, setLocalCollege] = useState(collegeInfo);
   const [localLinks, setLocalLinks] = useState(links);
 
   const handleContinue = (e: React.FormEvent) => {
     e.preventDefault();
-    updateData({ fullName: localName.trim(), collegeInfo: localCollege, links: localLinks });
+    updateData({ fullName: localName.trim(), gender: localGender, collegeInfo: localCollege, links: localLinks });
     nextStep();
   };
 
@@ -39,6 +40,22 @@ export default function Step2Profile() {
               className="w-full pl-12 pr-4 py-3.5 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-[15px]"
               autoFocus
             />
+          </div>
+          
+          <div className="relative group">
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/50 group-focus-within:text-primary transition-colors" />
+            <select
+              required
+              value={localGender}
+              onChange={(e) => setLocalGender(e.target.value)}
+              className="w-full pl-12 pr-4 py-3.5 bg-surface-container-low border border-outline-variant/30 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-[15px] appearance-none"
+            >
+              <option value="" disabled>Select Gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Non-Binary">Non-Binary</option>
+              <option value="Prefer not to say">Prefer not to say</option>
+            </select>
           </div>
         </div>
 
