@@ -1,25 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Mail, Lock } from "lucide-react";
+import { login, signup } from "../actions";
 
-export default function ParticipantAuthPage() {
+function ParticipantAuthContent() {
+  const searchParams = useSearchParams();
+  const errorMessage = searchParams.get("error");
   const [isSignIn, setIsSignIn] = useState(true);
-  const router = useRouter();
-
-  const handleAuth = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSignIn) {
-      // Simulate login for existing user -> dashboard
-      router.push("/participant/dashboard");
-    } else {
-      // Create Account -> Start Onboarding
-      router.push("/onboarding/participant");
-    }
-  };
 
   return (
     <motion.div 
@@ -64,12 +55,18 @@ export default function ParticipantAuthPage() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.2 }}
-          onSubmit={handleAuth}
+          action={isSignIn ? login : signup}
           className="space-y-4"
         >
+          {errorMessage && (
+            <div className="bg-error/10 text-error text-[13px] font-bold p-3 rounded-xl mb-4 border border-error/20">
+              {errorMessage}
+            </div>
+          )}
           <div className="relative group">
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/50 group-focus-within:text-primary transition-colors" />
             <input 
+              name="email"
               type="email" 
               placeholder="Email address" 
               required 
@@ -80,6 +77,7 @@ export default function ParticipantAuthPage() {
           <div className="relative group">
             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/50 group-focus-within:text-primary transition-colors" />
             <input 
+              name="password"
               type="password" 
               placeholder="Password" 
               required 
@@ -107,9 +105,17 @@ export default function ParticipantAuthPage() {
 
       <div className="mt-8 text-center">
         <Link href="/" className="text-[13px] text-on-surface-variant hover:text-primary transition-colors font-medium">
-          ← Back to HackFlow
+          ← Back to HackOS
         </Link>
       </div>
     </motion.div>
+  );
+}
+
+export default function ParticipantAuthPage() {
+  return (
+    <Suspense fallback={null}>
+      <ParticipantAuthContent />
+    </Suspense>
   );
 }

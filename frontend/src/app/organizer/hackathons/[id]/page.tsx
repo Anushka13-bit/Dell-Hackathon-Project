@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
-export default function IndividualHackathonRedirect({ params }: { params: { id: string } }) {
+export default async function IndividualHackathonRedirect({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params;
   // Redirect to the analytics page as the default overview
-  redirect(`/organizer/hackathons/${params.id}/analytics`);
+  redirect(`/organizer/hackathons/${resolvedParams.id}/analytics`);
 }

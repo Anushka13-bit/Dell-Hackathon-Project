@@ -1,20 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Mail, Lock, Building2 } from "lucide-react";
+import { loginOrganizer, signupOrganizer } from "../actions";
 
-export default function OrganizerAuthPage() {
+function OrganizerAuthContent() {
+  const searchParams = useSearchParams();
+  const errorMessage = searchParams.get("error");
   const [isSignIn, setIsSignIn] = useState(true);
-  const router = useRouter();
-
-  const handleAuth = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simulate auth & redirect directly to dashboard
-    router.push("/organizer/dashboard");
-  };
 
   return (
     <motion.div 
@@ -62,13 +58,19 @@ export default function OrganizerAuthPage() {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: isSignIn ? 20 : -20 }}
           transition={{ duration: 0.3 }}
-          onSubmit={handleAuth}
+          action={isSignIn ? loginOrganizer : signupOrganizer}
           className="space-y-4"
         >
+          {errorMessage && (
+            <div className="bg-error/10 text-error text-[13px] font-bold p-3 rounded-xl mb-4 border border-error/20">
+              {errorMessage}
+            </div>
+          )}
           {!isSignIn && (
             <div className="relative">
               <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/50" />
               <input 
+                name="organization_name"
                 type="text" 
                 placeholder="Organization Name" 
                 required 
@@ -80,6 +82,7 @@ export default function OrganizerAuthPage() {
           <div className="relative">
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/50" />
             <input 
+              name="email"
               type="email" 
               placeholder="Work Email" 
               required 
@@ -90,6 +93,7 @@ export default function OrganizerAuthPage() {
           <div className="relative">
             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/50" />
             <input 
+              name="password"
               type="password" 
               placeholder="Password" 
               required 
@@ -109,9 +113,17 @@ export default function OrganizerAuthPage() {
 
       <div className="mt-8 text-center">
         <Link href="/" className="text-[13px] text-on-surface-variant hover:text-tertiary transition-colors font-medium">
-          ← Back to HackFlow
+          ← Back to HackOS
         </Link>
       </div>
     </motion.div>
+  );
+}
+
+export default function OrganizerAuthPage() {
+  return (
+    <Suspense fallback={null}>
+      <OrganizerAuthContent />
+    </Suspense>
   );
 }

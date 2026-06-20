@@ -168,7 +168,7 @@ export default function CreateHackathonStep2() {
 
       {/* Footer / Credits */}
       <footer className="mt-auto p-margin-desktop text-center">
-        <p className="text-label-sm text-outline-variant font-label-sm">© 2024 HackFlow Organizer Portal • Crafted for Organic Excellence</p>
+        <p className="text-label-sm text-outline-variant font-label-sm">© 2024 HackOS Organizer Portal • Crafted for Organic Excellence</p>
       </footer>
     </div>
   );

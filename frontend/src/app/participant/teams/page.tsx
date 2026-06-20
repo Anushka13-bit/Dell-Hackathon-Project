@@ -148,8 +148,8 @@ export default function TeamFormationHub() {
       <footer className="w-full py-12 bg-surface-container-low border-t border-outline-variant">
         <div className="flex flex-col md:flex-row justify-between items-center px-6 md:px-margin-desktop gap-stack-md max-w-[1280px] mx-auto">
           <div className="flex flex-col items-center md:items-start gap-2">
-            <span className="font-headline-sm text-headline-sm text-primary">HackFlow</span>
-            <p className="font-label-sm text-label-sm text-on-surface-variant">© 2024 HackFlow. High-End Editorial Hackathon Management.</p>
+            <span className="font-headline-sm text-headline-sm text-primary">HackOS</span>
+            <p className="font-label-sm text-label-sm text-on-surface-variant">© 2024 HackOS. High-End Editorial Hackathon Management.</p>
           </div>
           <div className="flex flex-wrap justify-center gap-6">
             <Link className="text-on-surface-variant font-label-sm hover:text-primary underline transition-all duration-300" href="#">Privacy Policy</Link>

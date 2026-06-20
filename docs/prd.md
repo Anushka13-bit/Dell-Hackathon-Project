@@ -1062,334 +1062,315 @@ Notification Service
 The architecture scales horizontally by increasing worker nodes without modifying application logic, enabling HackOS to support large university, enterprise, and global hackathons.
 
 
-## 11. Reviewer Intelligence Architecture
+## 11. Reviewer Intelligence & Assignment Engine
 
 ### 11.1 Reviewer Intelligence Pipeline
 
-HackOS transforms reviewer resumes, professional profiles, research interests, judging history, and declared expertise into structured reviewer representations used throughout the evaluation lifecycle.
+HackOS transforms reviewer resumes into structured reviewer profiles that can be used for automated reviewer assignment.
 
 #### Processing Pipeline
 
 ```text
-Reviewer Registration
+Reviewer Resume Upload
         │
         ▼
-Profile Extraction Service
+PDF Extraction Service
         │
         ▼
-Reviewer Intelligence Engine
+LLM Skill Extraction
         │
-        ├── Expertise Extraction
-        ├── Domain Classification
-        ├── Capacity Estimation
-        ├── Availability Analysis
-        ├── Reliability Scoring
-        └── Conflict Detection
+        ▼
+Skill Categorization Engine
+        │
+        ▼
+Reviewer Vector Generation
         │
         ▼
 Reviewer Feature Store
 ```
 
+Reviewer resumes are uploaded through the Reviewer API. The platform extracts resume content, identifies technical skills using an LLM-powered extraction pipeline, categorizes those skills into predefined technology domains, and generates reviewer expertise vectors.
+
 Each reviewer is represented as:
 
 ```json
 {
-    "expertise_vector": ["..."],
-    "semantic_embedding": ["..."],
-    "capacity": 24,
-    "availability": "6 hours",
-    "reliability_score": 0.95,
-    "conflict_metadata": {}
+    "skills_json": {...},
+    "skill_vector": {
+        "backend": 1.0,
+        "frontend": 0.0,
+        "ai_ml": 0.7,
+        "devops": 0.6,
+        "cybersecurity": 0.37
+    },
+    "primary_specialization": "backend",
+    "secondary_specializations": [
+        "ai_ml",
+        "devops"
+    ]
 }
 ```
 
-This representation enables intelligent assignment, workload balancing, conflict prevention, and dynamic reassignment.
+This representation enables automated expertise matching and reviewer allocation.
 
 ---
 
-### 11.2 Expertise Matching Engine
+### 11.2 Project Representation
 
-Both project submissions and reviewer profiles are converted into semantic embeddings.
+Project submissions are converted into structured project vectors.
 
-#### Project Representation
+Each submission contains:
 
-Generated from:
+* Problem Statement
+* Proposed Solution
+* Supporting Context
 
-- Problem Statement
-- Project Description
-- Tech Stack
-- Architecture Summary
-- Submitted Documentation
+The submission analysis service extracts relevant technical domains and generates an idea vector.
 
-#### Reviewer Representation
+Example:
 
-Generated from:
-
-- Resume
-- Expertise Areas
-- Research Interests
-- Professional Experience
-- Previous Judging History
-
-The system computes semantic similarity between projects and reviewers.
-
-```text
-expertise_score = cosine_similarity(project_embedding, reviewer_embedding)
+```json
+{
+    "backend": 0.6,
+    "frontend": 0.1,
+    "ai_ml": 0.2,
+    "devops": 0.1
+}
 ```
 
-To improve scalability, HackOS does not compare every project against every reviewer.
-Instead, Approximate Nearest Neighbor (ANN) search retrieves the top candidate reviewers for each project.
-
-```text
-Project
-   │
-   ▼
-Top 50 Candidate Reviewers
-```
-
-This reduces computational complexity while preserving assignment quality.
+The idea vector represents the relative importance of each technical domain within the project.
 
 ---
 
-### 11.3 Reviewer Capacity & Workload Modeling
+### 11.3 Compatibility Scoring Engine
 
-Every reviewer is assigned a dynamic review capacity.
-Capacity is estimated using:
+HackOS evaluates reviewer-project alignment using vector similarity.
 
-- Declared Availability
-- Historical Review Speed
-- Event Duration
-- Review Complexity
-
-**Example:**
-
-```text
-capacity = available_hours / estimated_review_time
-```
-
-A reviewer with:
-
-- **6 Available Hours**
-- **15 Minutes Per Review**
-
-can support approximately: **24 Reviews**
-
-The assignment engine never exceeds reviewer capacity limits.
-This prevents reviewer fatigue and improves evaluation quality.
-
----
-
-### 11.4 Conflict Detection Framework
-
-Conflict detection acts as a hard constraint rather than a scoring penalty.
-Any reviewer-project pair violating conflict policies is automatically removed from consideration.
-
-#### Supported Conflict Rules
-
-**Institutional Conflict**
-
-Reviewers cannot evaluate projects from:
-- Their college
-- Their organization
-- Their startup
-- Their research lab
-
-**Declared Conflicts**
-
-Reviewers may explicitly declare:
-- Teams
-- Individuals
-- Organizations
-- Sponsors
-
-...they cannot evaluate.
-
-**Historical Collaboration Detection**
-
-Optional advanced checks include:
-- Shared GitHub repositories
-- Previous project collaboration
-- Mentor-team relationships
-
-If a conflict exists:
+For each reviewer-project pair:
 
 ```python
-assignment_allowed = False
+compatibility_score =
+Σ(
+    reviewer_skill_score
+    ×
+    project_domain_weight
+)
 ```
 
-The pair is excluded from optimization.
-This guarantees zero conflict-of-interest assignments.
+The resulting score quantifies how closely a reviewer's expertise aligns with the technical requirements of a project.
+
+Scores are normalized to a value between:
+
+```text
+0.0 → Poor Match
+1.0 → Strong Match
+```
+
+---
+
+### 11.4 Compatibility Matrix Generation
+
+To support global optimization, the platform generates a compatibility matrix containing every valid reviewer-project combination.
+
+Example:
+
+```text
+                Reviewer A   Reviewer B   Reviewer C
+Project 1          0.92         0.86         0.44
+Project 2          0.87         0.81         0.39
+Project 3          0.58         0.34         0.76
+```
+
+This matrix serves as the foundation for assignment optimization.
 
 ---
 
 ### 11.5 Assignment Optimization Engine
 
-HackOS models reviewer assignment as a constrained optimization problem.
-Each project requires multiple independent reviewers.
+HackOS models reviewer assignment as a global optimization problem.
 
-**Example:**
+#### Assignment Objectives
 
-```text
-Project A
-   ├── Reviewer 1
-   ├── Reviewer 2
-   └── Reviewer 3
-```
-
-#### Assignment Score
-
-For every valid reviewer-project pair:
-
-```text
-assignment_score = (
-    0.45 * expertise_score
-  + 0.25 * workload_balance_score
-  + 0.15 * availability_score
-  + 0.10 * diversity_score
-  + 0.05 * reliability_score
-)
-```
-
-Where:
-
-- **Expertise Score:** Measures reviewer-domain alignment.
-- **Workload Balance Score:** Rewards equitable assignment distribution.
-- **Availability Score:** Prioritizes reviewers with available judging windows.
-- **Diversity Score:** Encourages evaluation from reviewers with complementary backgrounds.
-- **Reliability Score:** Rewards reviewers with strong historical completion rates.
+* Maximize reviewer-project compatibility
+* Respect reviewer capacity constraints
+* Produce globally optimal reviewer allocations
+* Minimize assignment cost across all projects
 
 #### Optimization Strategy
 
-The assignment engine uses a Min-Cost Flow optimization model implemented with Google OR-Tools.
-This enables:
+The platform constructs a flow network where:
 
-- Multiple reviewers per project
-- Reviewer capacity constraints
-- Workload balancing
-- Hard conflict constraints
-- Dynamic reassignment support
+```text
+Source
+    │
+    ▼
+Project Nodes
+    │
+    ▼
+Reviewer Nodes
+    │
+    ▼
+Sink
+```
 
-Unlike Hungarian-based approaches, Min-Cost Flow scales efficiently to large events while maintaining globally optimized assignments.
+Edge costs are computed using:
+
+```python
+assignment_cost =
+(1 - compatibility_score)
+```
+
+The assignment engine uses a Min-Cost Flow optimization model to determine the lowest-cost global assignment configuration.
+
+Unlike greedy assignment approaches, this method considers all projects and reviewers simultaneously, producing globally optimized assignments.
 
 ---
 
-### 11.6 Assignment Validation Framework
+### 11.6 Reviewer Capacity Management
 
-Before assignments are finalized, the system validates overall assignment quality.
+Each reviewer is assigned a configurable maximum review capacity.
 
-**Expertise Coverage Validation**
-
-Each project must satisfy: At least 2 domain-relevant reviewers.
-- **Target:** Average Expertise Match > 0.85
-
-**Workload Distribution Validation**
-
-Measures fairness of assignment allocation.
-- **Metric:** `workload_variance`
-- **Target:** ±10% reviewer workload deviation
-
-**Conflict Validation**
-
-- **Target:** 0 conflict assignments
-
-**Assignment Confidence Score**
-
-Final assignment quality metric:
-
-```text
-assignment_confidence = (
-    0.50 * expertise_quality
-  + 0.30 * workload_balance
-  + 0.20 * reliability_coverage
-)
+```json
+{
+    "max_load": 20
+}
 ```
 
-**Output:** `0.0 – 1.0`
+Available reviewer capacity is calculated dynamically using assignment history:
 
-Assignments below the minimum confidence threshold are automatically re-optimized.
+```python
+available_capacity =
+max_load -
+current_assignment_count
+```
+
+This prevents reviewers from exceeding their configured workload limits.
 
 ---
 
-### 11.7 Dynamic Reassignment & Failure Recovery
+### 11.7 Assignment Validation Framework
 
-HackOS continuously monitors assignment health throughout the evaluation process.
+After assignment generation, HackOS validates overall assignment quality.
 
-#### Reviewer No-Show Detection
+#### Workload Distribution Validation
 
-The platform tracks:
+The system measures reviewer assignment distribution using workload variance.
 
-- Login Activity
-- Assignment Acceptance
-- Review Submission Progress
-- Deadline Compliance
-
-Reviewers failing to meet activity thresholds are flagged automatically.
-
-#### Automatic Reassignment
-
-If a reviewer becomes unavailable:
-
-```text
-Reviewer
-      ↓
-Projects Returned To Pool
-      ↓
-Optimization Engine
-      ↓
-Replacement Assignment
+```python
+workload_variance =
+max_assignments -
+min_assignments
 ```
 
-Only incomplete reviews are reassigned. Completed reviews remain preserved.
+The goal is to minimize reviewer workload imbalance while preserving assignment quality.
 
-#### Capacity Rebalancing
+#### Assignment Quality Validation
 
-When:
+The validation framework evaluates:
 
-- Additional reviewers join
-- Projects increase
-- Reviewers withdraw
+* Reviewer utilization
+* Workload distribution
+* Assignment completeness
 
-...the system automatically redistributes workload while preserving assignment quality.
+---
 
-#### Real-Time Assignment Updates
+### 11.8 Assignment Rebalancing
 
-All assignment changes generate events through:
+If workload variance exceeds acceptable thresholds, the platform performs post-assignment rebalancing.
+
+#### Rebalancing Process
 
 ```text
-Redis Pub/Sub
+Initial Assignment
         │
         ▼
-WebSocket Gateway
+Variance Check
         │
         ▼
-Admin Dashboard
+Identify Overloaded Reviewer
+        │
+        ▼
+Identify Underutilized Reviewer
+        │
+        ▼
+Find Lowest Compatibility Loss Reassignment
+        │
+        ▼
+Updated Assignment Set
 ```
 
-Organizers receive immediate visibility into:
-
-- Reviewer utilization
-- Assignment health
-- Reassignment events
-- Capacity bottlenecks
-- Evaluation progress
+The rebalancer attempts to improve workload distribution while minimizing the reduction in compatibility quality.
 
 ---
 
-### 11.8 Scalability Characteristics
+### 11.9 Assignment Persistence & APIs
 
-The reviewer intelligence subsystem is designed for large-scale hackathons.
+Generated assignments are persisted in the Assignment Store.
 
-| Metric | Target |
-|---|---|
-| Projects | 20,000+ |
-| Reviewers | 5,000+ |
-| Review Assignments | 60,000+ |
-| Expertise Search Latency | <50 ms |
-| Assignment Runtime | <60 sec |
-| Reassignment Runtime | <10 sec |
-| Conflict Detection Accuracy | >99% |
+Each assignment contains:
 
-The architecture scales horizontally by increasing assignment workers and ANN search nodes, enabling enterprise, university, and global-scale hackathons without changes to assignment logic.
+```json
+{
+    "idea_id": "...",
+    "reviewer_id": "...",
+    "compatibility_score": 0.92,
+    "explanation": [
+        "Compatibility score: 0.92",
+        "Reviewer specialization: backend",
+        "Assigned using Min-Cost Flow optimization"
+    ]
+}
+```
+
+#### Reviewer APIs
+
+```http
+POST /reviewers/upload-resume
+```
+
+Uploads a reviewer resume, extracts expertise, generates reviewer vectors, and stores reviewer metadata.
+
+#### Assignment APIs
+
+```http
+POST /assignments/generate
+```
+
+Runs the complete assignment pipeline.
+
+```http
+GET /assignments
+```
+
+Returns all generated assignments.
+
+```http
+GET /assignments/reviewers
+```
+
+Returns registered reviewers and specialization information.
+
+```http
+GET /assignments/submissions
+```
+
+Returns submissions available for assignment.
+
+---
+
+### 11.10 Scalability Characteristics
+
+Current implementation characteristics:
+
+| Metric                          | Complexity                 |
+| ------------------------------- | -------------------------- |
+| Compatibility Matrix Generation | O(Submissions × Reviewers) |
+| Compatibility Scoring           | O(Categories)              |
+| Assignment Optimization         | Min-Cost Flow              |
+| Reviewer Load Lookup            | Single Aggregated Query    |
+| Assignment Persistence          | Bulk Insert                |
+
+The architecture is designed to support hundreds of reviewers and submissions with low-latency assignment generation while maintaining globally optimized reviewer allocation.
 
 
 ## 12. Bias Detection, Fairness & Auditability Architecture

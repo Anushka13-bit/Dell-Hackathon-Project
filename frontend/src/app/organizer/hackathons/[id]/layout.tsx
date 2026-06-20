@@ -2,16 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { use } from "react";
 
 export default function HackathonLayout({
   children,
   params,
 }: {
   children: React.ReactNode;
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const pathname = usePathname();
-  const id = params.id || "winter-2024";
+  const resolvedParams = use(params);
+  const id = resolvedParams.id || "winter-2024";
 
   const navLinks = [
     { name: "Overview", href: `/organizer/hackathons/${id}`, icon: "dashboard" },

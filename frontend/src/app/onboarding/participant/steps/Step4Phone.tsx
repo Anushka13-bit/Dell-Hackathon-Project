@@ -2,23 +2,23 @@
 
 import { useOnboardingStore } from "@/store/useOnboardingStore";
 import StepWrapper from "@/components/onboarding/StepWrapper";
-import { ArrowRight, Mail, CheckCircle2 } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { ArrowRight, Phone, CheckCircle2 } from "lucide-react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type OTPState = "idle" | "sending" | "sent" | "verifying" | "verified";
 
-export default function Step2Email() {
-  const { email, updateData, nextStep } = useOnboardingStore();
-  const [localEmail, setLocalEmail] = useState(email);
+export default function Step4Phone() {
+  const { phone, updateData, nextStep } = useOnboardingStore();
+  const [localPhone, setLocalPhone] = useState(phone);
   const [otpState, setOtpState] = useState<OTPState>("idle");
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const handleSendOTP = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!localEmail.includes("@")) return;
-    updateData({ email: localEmail });
+    if (localPhone.length < 5) return;
+    updateData({ phone: localPhone });
     setOtpState("sending");
     
     // Simulate API call
@@ -45,7 +45,7 @@ export default function Step2Email() {
       setOtpState("verifying");
       setTimeout(() => {
         setOtpState("verified");
-        updateData({ emailVerified: true });
+        updateData({ phoneVerified: true });
         setTimeout(() => {
           nextStep();
         }, 1500); // Wait for success animation
@@ -62,36 +62,41 @@ export default function Step2Email() {
   return (
     <StepWrapper>
       <div className="text-center mb-10">
-        <h1 className="text-[32px] font-bold text-on-surface mb-2 tracking-tight">Verify your email</h1>
-        <p className="text-on-surface-variant text-[16px]">We'll use this for announcements and updates.</p>
+        <h1 className="text-[32px] font-bold text-on-surface mb-2 tracking-tight">Verify your phone</h1>
+        <p className="text-on-surface-variant text-[16px]">For important event communication and alerts.</p>
       </div>
 
       <AnimatePresence mode="wait">
         {otpState === "idle" || otpState === "sending" ? (
           <motion.form 
-            key="email-form"
+            key="phone-form"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             onSubmit={handleSendOTP} 
             className="space-y-6"
           >
-            <div className="relative group">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-on-surface-variant/50 group-focus-within:text-primary transition-colors" />
-              <input 
-                type="email" 
-                placeholder="Email Address" 
-                value={localEmail}
-                onChange={(e) => setLocalEmail(e.target.value)}
-                className="w-full pl-14 pr-4 py-4 bg-surface-container-low border border-outline-variant/30 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-[18px] font-medium"
-                autoFocus
-                disabled={otpState === "sending"}
-              />
+            <div className="relative group flex">
+              <div className="w-20 bg-surface-container-low border border-r-0 border-outline-variant/30 rounded-l-2xl flex items-center justify-center font-bold text-on-surface-variant">
+                +91
+              </div>
+              <div className="relative flex-1">
+                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-on-surface-variant/50 group-focus-within:text-primary transition-colors" />
+                <input 
+                  type="tel" 
+                  placeholder="Phone Number" 
+                  value={localPhone}
+                  onChange={(e) => setLocalPhone(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 bg-surface-container-low border border-outline-variant/30 rounded-r-2xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-[18px] font-medium"
+                  autoFocus
+                  disabled={otpState === "sending"}
+                />
+              </div>
             </div>
 
             <button 
               type="submit" 
-              disabled={otpState === "sending" || !localEmail}
+              disabled={otpState === "sending" || localPhone.length < 5}
               className="w-full bg-primary text-white py-4 rounded-2xl font-bold text-[16px] flex items-center justify-center gap-2 hover:bg-primary/90 transition-all hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-70 disabled:hover:translate-y-0"
             >
               {otpState === "sending" ? (
@@ -146,7 +151,7 @@ export default function Step2Email() {
               )}
               {otpState === "sent" && (
                 <p className="text-[13px] text-on-surface-variant font-medium">
-                  Code sent to <span className="text-on-surface font-bold">{localEmail}</span>
+                  Code sent to <span className="text-on-surface font-bold">+1 {localPhone}</span>
                 </p>
               )}
             </div>

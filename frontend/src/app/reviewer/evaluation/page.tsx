@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { signOut } from "@/app/auth/actions";
 
 export default function EvaluationCenter() {
   const [scores, setScores] = useState({
@@ -85,10 +86,12 @@ export default function EvaluationCenter() {
               <span className="material-symbols-outlined">help</span>
               Help Center
             </Link>
-            <button className="text-on-surface-variant hover:text-primary px-4 py-2 text-label-md flex items-center gap-3 w-full text-left">
-              <span className="material-symbols-outlined">logout</span>
-              Logout
-            </button>
+            <form action={signOut}>
+              <button type="submit" className="text-on-surface-variant hover:text-primary px-4 py-2 text-label-md flex items-center gap-3 w-full text-left">
+                <span className="material-symbols-outlined">logout</span>
+                Logout
+              </button>
+            </form>
           </div>
         </div>
       </aside>

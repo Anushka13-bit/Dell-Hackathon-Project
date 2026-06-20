@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 
 export default function CreateHackathonStep3() {
@@ -10,12 +10,7 @@ export default function CreateHackathonStep3() {
     { id: 3, name: "User Experience (UX)", weight: 15 },
   ]);
 
-  const [totalWeight, setTotalWeight] = useState(85);
-
-  useEffect(() => {
-    const total = rubrics.reduce((acc, curr) => acc + curr.weight, 0);
-    setTotalWeight(total);
-  }, [rubrics]);
+  const totalWeight = rubrics.reduce((acc, curr) => acc + curr.weight, 0);
 
   const handleWeightChange = (id: number, value: string) => {
     const parsedValue = parseInt(value) || 0;
