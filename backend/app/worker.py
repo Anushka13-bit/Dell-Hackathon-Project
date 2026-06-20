@@ -10,10 +10,10 @@ load_dotenv()
 # Add project root to sys.path to resolve participant_ai
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from backend.app.database import execute
+from app.database import execute
 from participant_ai.pipelines.resume_rag.parser import parse_and_vectorize_batch
 from participant_ai.pipelines.bias.analyzer import BiasDetectionService
-from backend.app.database import fetch_all
+from app.database import fetch_all
 
 # Initialize Celery App
 celery_app = Celery(

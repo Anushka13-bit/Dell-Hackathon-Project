@@ -1,7 +1,7 @@
 from uuid import UUID
 
-from backend.app.deps import SessionLocal
-from backend.app.models import IdeaSubmission
+from app.deps import SessionLocal
+from app.models import IdeaSubmission
 
 
 def get_submission_by_id(

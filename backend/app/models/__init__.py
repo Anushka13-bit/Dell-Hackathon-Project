@@ -9,3 +9,9 @@ from .problem_statement import ProblemStatement
 from .user_role import UserRole
 from .evaluation import Evaluation
 from .hackathon import Hackathon
+from .bias_alert import BiasAlert
+from .fairness_report import FairnessReport
+from .ranking_confidence import RankingConfidence
+from .reviewer_stats import ReviewerStats
+from .normalised_score import NormalizedScore
+

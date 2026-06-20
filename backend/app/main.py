@@ -3,7 +3,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import participants, reviewers, hackathons, teams, submissions, assignments, evaluations, leaderboard, problem_statements, organizer
+from .routers import (participants,reviewers,hackathons,teams,submissions,assignments,evaluations,leaderboard,problem_statements,organizer,fairness,tasks)
 from .core.config import settings
 from .core.exceptions import setup_exception_handlers
 from .core.logging import logger
@@ -36,6 +36,8 @@ app.include_router(evaluations.router, prefix="/evaluations", tags=["evaluations
 app.include_router(leaderboard.router, prefix="/leaderboard", tags=["leaderboard"])
 app.include_router(problem_statements.router, prefix="/problem-statements", tags=["problem_statements"])
 app.include_router(organizer.router, prefix="/organizer", tags=["organizer"])
+app.include_router(fairness.router,prefix="/fairness",tags=["fairness"])
+app.include_router(tasks.router,prefix="/tasks",tags=["tasks"])
 
 # Startup event
 @app.on_event("startup")

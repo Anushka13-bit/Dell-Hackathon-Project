@@ -1,12 +1,12 @@
-from backend.app.services.reviewer_assignment.assignment.post_check import (
+from app.services.reviewer_assignment.assignment.post_check import (
     validate_assignments
 )
 
-from backend.app.services.reviewer_assignment.scoring.compatibility_matrix import (
+from app.services.reviewer_assignment.scoring.compatibility_matrix import (
     build_compatibility_matrix
 )
 
-from backend.app.services.reviewer_assignment.db.reviewer_repository import (
+from app.services.reviewer_assignment.db.reviewer_repository import (
     get_all_reviewers
 )
 
@@ -130,7 +130,7 @@ def rebalance_assignments(
 
 if __name__ == "__main__":
 
-    from backend.app.services.reviewer_assignment.assignment.global_assignment import (
+    from app.services.reviewer_assignment.assignment.global_assignment import (
         solve_assignment
     )
 

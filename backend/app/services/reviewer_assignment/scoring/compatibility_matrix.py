@@ -1,12 +1,12 @@
-from backend.app.services.reviewer_assignment.db.submission_repository import (
+from app.services.reviewer_assignment.db.submission_repository import (
     get_all_submissions
 )
 
-from backend.app.services.reviewer_assignment.db.reviewer_repository import (
+from app.services.reviewer_assignment.db.reviewer_repository import (
     get_all_reviewers
 )
 
-from backend.app.services.reviewer_assignment.scoring.compatibility import (
+from app.services.reviewer_assignment.scoring.compatibility import (
     calculate_compatibility
 )
 

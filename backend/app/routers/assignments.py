@@ -10,6 +10,10 @@ from ..deps import get_db
 from ..models.assignment import Assignment
 from ..models.reviewer import Reviewer
 
+from app.tasks.reviewer_tasks import (
+    reviewer_assignment_task
+)
+
 router = APIRouter()
 
 
@@ -61,17 +65,17 @@ async def create_assignment(data: AssignmentCreate, db: Session = Depends(get_db
 
 @router.post("/generate")
 def generate_assignments():
-    """Runs the complete reviewer assignment pipeline (min-cost flow optimization) and persists assignments."""
-    from backend.app.services.reviewer_assignment.assignment.persist_assignment import persist_assignments
-    
-    try:
-        assignments = persist_assignments()
-        return {
-            "message": "Assignments generated successfully",
-            "count": len(assignments)
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    """
+    Queue reviewer assignment generation in the background.
+    """
+
+    task = reviewer_assignment_task.delay()
+
+    return {
+        "status": "queued",
+        "message": "Reviewer assignment pipeline started",
+        "task_id": task.id
+    }
 
 
 @router.get("/", response_model=List[AssignmentOut])

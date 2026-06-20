@@ -13,6 +13,8 @@ class Reviewer(Base):
     skills_json = Column(JSON, nullable=True)
     skill_vector = Column(JSON, nullable=True)
     primary_specialization = Column(VARCHAR(100), nullable=True)
+    max_load = Column(Integer,default=5,nullable=False)
     secondary_specializations = Column(JSON, nullable=True)
     current_load = Column(Integer, default=0)
     created_at = Column(TIMESTAMP, nullable=True)
+    

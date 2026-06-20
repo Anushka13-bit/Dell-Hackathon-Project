@@ -1,8 +1,8 @@
 from uuid import UUID
 
-from backend.app.deps import SessionLocal
-from backend.app.models import Reviewer
-from backend.app.services.reviewer_assignment.db.load_service import get_reviewer_load
+from app.deps import SessionLocal
+from app.models import Reviewer
+from app.services.reviewer_assignment.db.load_service import get_reviewer_load
 
 
 def save_reviewer(

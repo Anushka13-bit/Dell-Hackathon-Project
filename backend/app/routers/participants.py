@@ -279,7 +279,7 @@ async def process_resume_background(payload: BackgroundResumePayload):
     Triggers the Celery worker to parse the resume using the LLM
     and update the participant's skill vector and embeddings in the background.
     """
-    from backend.app.worker import process_resume_task
+    from app.worker import process_resume_task
     
     # Send the task to Celery
     task = process_resume_task.delay(payload.user_id, payload.raw_text)
