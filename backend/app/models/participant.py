@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Text, ARRAY, String
+from sqlalchemy import Column, Text, ARRAY, String, Float
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from .base import Base
@@ -16,3 +16,5 @@ class Participant(Base):
     declared_skills = Column(ARRAY(String), default=[])
     skill_vector = Column(JSONB, nullable=True)
     team_id = Column(UUID(as_uuid=True), nullable=True)
+    vectorization_status = Column(String(50), default='pending')
+    duplication_score = Column(Float, nullable=True)

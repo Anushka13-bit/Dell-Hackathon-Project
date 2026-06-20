@@ -1,5 +1,5 @@
-from app.db.session import SessionLocal
-from app.db.db import Assignment
+from backend.app.deps import SessionLocal
+from backend.app.models import Assignment
 from sqlalchemy import func
 
 

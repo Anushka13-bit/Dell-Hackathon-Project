@@ -1,12 +1,12 @@
-from app.assignment.global_assignment import (
+from backend.app.services.reviewer_assignment.assignment.global_assignment import (
     solve_assignment
 )
 
-from app.assignment.post_check import (
+from backend.app.services.reviewer_assignment.assignment.post_check import (
     validate_assignments
 )
 
-from app.assignment.rebalancer import (
+from backend.app.services.reviewer_assignment.assignment.rebalancer import (
     rebalance_assignments
 )
 

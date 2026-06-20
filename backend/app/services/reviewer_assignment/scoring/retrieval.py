@@ -1,14 +1,14 @@
 from uuid import UUID
 
-from app.db.reviewer_repository import (
+from backend.app.services.reviewer_assignment.db.reviewer_repository import (
     get_all_reviewers
 )
 
-from app.db.submission_repository import (
+from backend.app.services.reviewer_assignment.db.submission_repository import (
     get_submission_by_id
 )
 
-from app.scoring.compatibility import (
+from backend.app.services.reviewer_assignment.scoring.compatibility import (
     calculate_compatibility
 )
 
@@ -70,7 +70,7 @@ def get_top_reviewers(
 
 if __name__ == "__main__":
 
-    from app.db.submission_repository import (
+    from backend.app.services.reviewer_assignment.db.submission_repository import (
         get_all_submissions
     )
 

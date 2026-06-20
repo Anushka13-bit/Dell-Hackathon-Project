@@ -1,12 +1,12 @@
 import uuid
 
-from app.db.db import Assignment
+from backend.app.models import Assignment
 
-from app.db.assignment_repository import (
+from backend.app.services.reviewer_assignment.db.assignment_repository import (
     save_assignments_bulk
 )
 
-from app.assignment.assignment_service import (
+from backend.app.services.reviewer_assignment.assignment.assignment_service import (
     generate_assignments
 )
 

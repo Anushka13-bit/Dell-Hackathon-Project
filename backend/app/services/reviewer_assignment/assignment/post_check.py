@@ -1,8 +1,8 @@
-from app.scoring.variance import (
+from backend.app.services.reviewer_assignment.scoring.variance import (
     calculate_variance
 )
 
-from app.db.reviewer_repository import (
+from backend.app.services.reviewer_assignment.db.reviewer_repository import (
     get_all_reviewers
 )
 
@@ -48,7 +48,7 @@ def validate_assignments(
 
 if __name__ == "__main__":
 
-    from app.assignment.global_assignment import (
+    from backend.app.services.reviewer_assignment.assignment.global_assignment import (
         solve_assignment
     )
 

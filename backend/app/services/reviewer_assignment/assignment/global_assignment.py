@@ -1,10 +1,10 @@
 import networkx as nx
 
-from app.db.load_service import (
+from backend.app.services.reviewer_assignment.db.load_service import (
     get_all_reviewer_loads
 )
 
-from app.scoring.compatibility_matrix import (
+from backend.app.services.reviewer_assignment.scoring.compatibility_matrix import (
     build_compatibility_matrix
 )
 

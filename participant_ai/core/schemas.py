@@ -97,8 +97,33 @@ class PSRequirement(BaseModel):
     team_size: int
 
 
+from enum import Enum
+
+class InviteStatus(str, Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+    CANCELLED = "cancelled"
+
+class InviteDirection(str, Enum):
+    LEADER_TO_PARTICIPANT = "leader_to_participant"
+    PARTICIPANT_TO_LEADER = "participant_to_leader"
+
+class Invite(BaseModel):
+    invite_id: str
+    team_id: str
+    participant_id: str
+    direction: InviteDirection
+    initiated_by_id: str
+    status: InviteStatus = InviteStatus.PENDING
+    created_at: str
+    responded_at: str | None = None
+
 class Team(BaseModel):
     team_id: str
     name: str
+    leader_id: str
     member_ids: list[str] = Field(default_factory=list)
     slots_remaining: int
+    is_open: bool = True
+    is_locked: bool = False

@@ -181,6 +181,97 @@ def main() -> None:
     else:
         print(f"{late_joiner.id} -> No open team found")
 
+    print("\n" + "="*50)
+    print("=== MANUAL TEAM FORMATION (INVITES & REQUESTS) ===")
+    from participant_ai.pipelines.team_formation.invites import (
+        create_team, invite_participant, request_to_join, respond_to_invite, lock_team,
+        suggest_invitees_for_leader, suggest_teams_for_participant
+    )
+    from participant_ai.core.schemas import InviteStatus
+    
+    leader = participants[0]
+    p_invitee1 = participants[1]
+    p_invitee2 = participants[2]
+    p_suggestion = participants[3]
+    p_joiner = participants[4]
+    
+    all_invites = []
+    
+    # 1. Create Team flow
+    print("\n--- 1. Create Team Flow ---")
+    ps = ps_list[0]
+    reqs_dict = {ps.ps_id: ps}
+    team_manual = create_team(leader, ps.ps_id, reqs_dict)
+    print(f"Leader {leader.id} created Team: {team_manual.name} (Slots remaining: {team_manual.slots_remaining})")
+    
+    inv1 = invite_participant(team_manual, leader.id, p_invitee1.id, all_invites)
+    all_invites.append(inv1)
+    inv2 = invite_participant(team_manual, leader.id, p_invitee2.id, all_invites)
+    all_invites.append(inv2)
+    print(f"Leader invited {p_invitee1.id} and {p_invitee2.id}. Invites pending.")
+    
+    inv1, updated_team = respond_to_invite(inv1, p_invitee1.id, accept=True, team=team_manual, all_invites=all_invites)
+    print(f"{p_invitee1.id} accepted. Team members: {updated_team.member_ids}")
+    
+    inv2, updated_team = respond_to_invite(inv2, p_invitee2.id, accept=True, team=team_manual, all_invites=all_invites)
+    print(f"{p_invitee2.id} accepted. Team members: {updated_team.member_ids}")
+    
+    print("\nLeader requests suggestions for remaining slots...")
+    unassigned_for_demo = [p_suggestion, p_joiner]
+    leader_members = [leader, p_invitee1, p_invitee2]
+    suggestions = suggest_invitees_for_leader(
+        team_manual, leader_members, unassigned_for_demo, ps.required_vector, all_invites, top_n=2
+    )
+    for s in suggestions:
+        print(f"  Suggested: {s.id}")
+        
+    top_suggestion = suggestions[0]
+    inv3 = invite_participant(team_manual, leader.id, top_suggestion.id, all_invites)
+    all_invites.append(inv3)
+    print(f"Leader invited top suggestion {top_suggestion.id}.")
+    
+    inv3, updated_team = respond_to_invite(inv3, top_suggestion.id, accept=True, team=team_manual, all_invites=all_invites)
+    print(f"{top_suggestion.id} accepted. Team members: {updated_team.member_ids}")
+    
+    locked_team = lock_team(updated_team, leader.id, min_size=1, all_invites=all_invites)
+    print(f"Leader locked the team. is_open={locked_team.is_open}, is_locked={locked_team.is_locked}")
+    
+    # 2. Join Team flow
+    print("\n--- 2. Join Team Flow ---")
+    ps2 = ps_list[1]
+    team_open = create_team(participants[5], ps2.ps_id, {ps2.ps_id: ps2})
+    print(f"Another Leader {participants[5].id} created open Team: {team_open.name}")
+    
+    open_teams = [locked_team, team_open]
+    all_req_vecs = {
+        locked_team.team_id: ps.required_vector,
+        team_open.team_id: ps2.required_vector
+    }
+    all_team_members = {
+        locked_team.team_id: [p for p in participants if p.id in locked_team.member_ids],
+        team_open.team_id: [p for p in participants if p.id in team_open.member_ids]
+    }
+    
+    print(f"Participant {p_joiner.id} requests suggestions for teams to join...")
+    join_suggestions = suggest_teams_for_participant(
+        p_joiner, open_teams, all_req_vecs, all_team_members, all_invites, top_n=2
+    )
+    for t in join_suggestions:
+        print(f"  Suggested Team: {t.name}")
+        
+    if join_suggestions:
+        top_team = join_suggestions[0]
+        join_req = request_to_join(top_team, p_joiner, all_invites)
+        all_invites.append(join_req)
+        print(f"Participant {p_joiner.id} requested to join {top_team.name}.")
+        
+        join_req, joined_team = respond_to_invite(join_req, top_team.leader_id, accept=True, team=top_team, all_invites=all_invites)
+        print(f"Leader {top_team.leader_id} accepted the request! Team members: {joined_team.member_ids}")
+        
+    print("\nFinal Invite Statuses:")
+    for inv in all_invites:
+        print(f"  Invite {inv.invite_id[:8]} | Dir: {inv.direction.value} | Status: {inv.status.value}")
+
 
 if __name__ == "__main__":
     main()

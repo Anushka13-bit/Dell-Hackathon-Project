@@ -38,7 +38,7 @@ class AssignmentOut(BaseModel):
 
 @router.post("/assign", response_model=AssignmentOut)
 async def create_assignment(data: AssignmentCreate, db: Session = Depends(get_db)):
-    """Assign a reviewer to an idea submission."""
+    """Assign a reviewer to an idea submission manually."""
     assignment = Assignment(
         assignment_id=uuid.uuid4(),
         idea_id=data.idea_id,
@@ -57,6 +57,21 @@ async def create_assignment(data: AssignmentCreate, db: Session = Depends(get_db
     db.commit()
     db.refresh(assignment)
     return assignment
+
+
+@router.post("/generate")
+def generate_assignments():
+    """Runs the complete reviewer assignment pipeline (min-cost flow optimization) and persists assignments."""
+    from backend.app.services.reviewer_assignment.assignment.persist_assignment import persist_assignments
+    
+    try:
+        assignments = persist_assignments()
+        return {
+            "message": "Assignments generated successfully",
+            "count": len(assignments)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/", response_model=List[AssignmentOut])
