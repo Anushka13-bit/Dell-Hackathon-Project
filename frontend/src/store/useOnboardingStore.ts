@@ -30,7 +30,6 @@ export interface OnboardingState {
   phoneVerified: boolean;
   gender: string;
   faceVerified: boolean;
-  faceVerified: boolean;
   collegeInfo: {
     college: string;
     degree: string;

@@ -19,7 +19,7 @@ export function QuickProfileCreator() {
         const formData = new FormData();
         formData.append("file", file);
         
-        const response = await fetch("http://localhost:8000/participants/upload_resume", {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/participants/upload_resume`, {
             method: "POST",
             body: formData,
         });

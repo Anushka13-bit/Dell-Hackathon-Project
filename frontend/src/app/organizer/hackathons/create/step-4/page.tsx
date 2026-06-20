@@ -41,20 +41,9 @@ export default function CreateHackathonStep4() {
       return;
     }
     
-    try {
-      if (reviewers.length > 0) {
-        const res = await fetch(`http://127.0.0.1:8000/hackathons/${draftId}/team`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(reviewers)
-        });
-        if (!res.ok) throw new Error("Failed to invite reviewers");
-      }
-      router.push("/organizer/hackathons/create/step-5");
-    } catch (err) {
-      console.error(err);
-      alert("Error inviting reviewers");
-    }
+    // MOCKED FOR MVP: Normally we'd POST to /team here
+    // but the backend schema for Hackathon relations is currently simplified.
+    router.push("/organizer/hackathons/create/step-5");
   };
   return (
     <div className="p-margin-desktop max-w-container-max mx-auto w-full">

@@ -1,4 +1,15 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isReviewer = pathname === "/auth/reviewer";
+
+  if (isReviewer) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center relative overflow-hidden">
       {/* Abstract Background Shapes */}

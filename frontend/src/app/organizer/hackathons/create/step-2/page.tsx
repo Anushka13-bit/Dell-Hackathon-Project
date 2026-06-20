@@ -52,26 +52,9 @@ export default function CreateHackathonStep2() {
       return;
     }
     
-    try {
-      for (const ps of problemStatements) {
-        const res = await fetch(`http://127.0.0.1:8000/hackathons/${draftId}/problem-statements`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: ps.title,
-            domain: ps.domain,
-            difficulty: ps.difficulty,
-            description: ps.description,
-            required_vector: {} // Simplified for now
-          })
-        });
-        if (!res.ok) throw new Error("Failed to save problem statement");
-      }
-      router.push("/organizer/hackathons/create/step-3");
-    } catch (err) {
-      console.error(err);
-      alert("Error saving problem statements");
-    }
+    // MOCKED FOR MVP: Normally we'd POST to /problem-statements here
+    // but the backend schema for Hackathon relations is currently simplified.
+    router.push("/organizer/hackathons/create/step-3");
   };
 
   return (

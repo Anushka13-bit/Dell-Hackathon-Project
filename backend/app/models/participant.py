@@ -18,3 +18,5 @@ class Participant(Base):
     team_id = Column(UUID(as_uuid=True), nullable=True)
     vectorization_status = Column(String(50), default='pending')
     duplication_score = Column(Float, nullable=True)
+    gender = Column(Text, nullable=True)
+    location = Column(Text, nullable=True)

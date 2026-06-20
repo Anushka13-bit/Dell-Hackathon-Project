@@ -122,8 +122,11 @@ class Invite(BaseModel):
 class Team(BaseModel):
     team_id: str
     name: str
-    leader_id: str
+    leader_id: str = ""
     member_ids: list[str] = Field(default_factory=list)
     slots_remaining: int
     is_open: bool = True
     is_locked: bool = False
+    coverage_score: float = 0.0
+    diversity_score: float = 0.0
+    formation_confidence: float = 0.0

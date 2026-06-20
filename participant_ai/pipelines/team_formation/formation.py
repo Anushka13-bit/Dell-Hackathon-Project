@@ -92,11 +92,43 @@ def _assign(
     )
 
 
-def form_teams(unassigned: list[Participant], requirements: list[PSRequirement]) -> dict:
-    """Coverage-Driven Team Assembly (PRD 10.5).
+def entropy(distribution: list[float]) -> float:
+    """Calculates Shannon entropy for a probability distribution."""
+    total = sum(distribution)
+    if total == 0:
+        return 0.0
+    return -sum((p / total) * math.log2(p / total) for p in distribution if p > 0)
+
+
+def diversity_score(members: list[Participant]) -> float:
+    """Diversity score based on PRD: entropy of colleges + entropy of dominant skills."""
+    if not members:
+        return 0.0
+        
+    # College Diversity
+    colleges = {}
+    for m in members:
+        c = m.college_name.strip().lower() if getattr(m, 'college_name', None) else "unknown"
+        colleges[c] = colleges.get(c, 0) + 1
     
-    Creates one team per PSRequirement, and fills it from the unassigned pool
-    by greedily maximizing coverage for that specific PS's skill requirements.
+    # Skill Diversity (using dominant skill category)
+    skills = {}
+    for m in members:
+        s = m.skill_vector.dominant(top_n=1)
+        dom = s[0] if s else "none"
+        skills[dom] = skills.get(dom, 0) + 1
+        
+    college_entropy = entropy(list(colleges.values()))
+    skill_entropy = entropy(list(skills.values()))
+    
+    # Normalize roughly (max entropy for 4 members is ~2.0)
+    return (college_entropy + skill_entropy) / 4.0
+
+
+def form_teams(unassigned: list[Participant], requirements: list[PSRequirement]) -> dict:
+    """Coverage-Driven Team Assembly (PRD 10.5 & 10.6).
+    
+    Includes Stage 1-3 (Coverage Greedy), Stage 4 (Diversity), and Stage 5 (Local Optimization).
     """
     pool: list[Participant] = list(unassigned)
     all_by_id = {p.id: p for p in pool}
@@ -105,6 +137,7 @@ def form_teams(unassigned: list[Participant], requirements: list[PSRequirement])
     
     # Track the required_vec for each team by team_id
     team_reqs: dict[str, SkillVector] = {}
+    team_members: dict[str, list[Participant]] = {}
 
     for req in requirements:
         team = Team(
@@ -115,17 +148,41 @@ def form_teams(unassigned: list[Participant], requirements: list[PSRequirement])
         )
         teams.append(team)
         team_reqs[team.team_id] = req.required_vector
-        members: list[Participant] = []
+        team_members[team.team_id] = []
 
+        # Stage 2 & 3: Coverage-Driven Candidate Scoring
         while team.slots_remaining > 0 and pool:
-            pick = best_fit(pool, members, req.required_vector)
-            if pick is None:
+            # If multiple candidates give same improvement, diversity should be the tiebreaker
+            best_candidates = []
+            best_delta = float("-inf")
+            
+            for candidate in pool:
+                delta = _improvement(team_members[team.team_id], candidate, req.required_vector)
+                if delta > best_delta + 0.01:
+                    best_delta = delta
+                    best_candidates = [candidate]
+                elif abs(delta - best_delta) <= 0.01:
+                    best_candidates.append(candidate)
+            
+            if not best_candidates:
                 break
-            delta = _improvement(members, pick, req.required_vector)
-            if delta < MIN_IMPROVEMENT and len(pool) > team.slots_remaining:
+                
+            # Stage 4: Diversity Optimization (Tie Breaker)
+            pick = best_candidates[0]
+            if len(best_candidates) > 1:
+                best_div = -1.0
+                for candidate in best_candidates:
+                    test_members = team_members[team.team_id] + [candidate]
+                    div = diversity_score(test_members)
+                    if div > best_div:
+                        best_div = div
+                        pick = candidate
+
+            if best_delta < MIN_IMPROVEMENT and len(pool) > team.slots_remaining:
                 pass # Still assign if we have slots to fill
+                
             pool.remove(pick)
-            _assign(team, pick, members, req.required_vector, log)
+            _assign(team, pick, team_members[team.team_id], req.required_vector, log)
 
     # Second pass: place leftovers on whichever open team they help most
     if pool:
@@ -137,7 +194,7 @@ def form_teams(unassigned: list[Participant], requirements: list[PSRequirement])
         for team in teams:
             if team.slots_remaining <= 0:
                 continue
-            members = _members_for_team(team, all_by_id)
+            members = team_members[team.team_id]
             req_vec = team_reqs[team.team_id]
             pick = best_fit(pool, members, req_vec)
             if pick is None:
@@ -155,6 +212,71 @@ def form_teams(unassigned: list[Participant], requirements: list[PSRequirement])
             if pool:
                 log.append("Second pass stopped — no positive improvement remaining")
             break
+
+    # Stage 5: Local Optimization Pass (Member Swapping)
+    log.append("Starting Stage 5: Local Optimization Swap Pass")
+    swaps_made = 0
+    for i, t1 in enumerate(teams):
+        for j, t2 in enumerate(teams):
+            if i >= j: continue
+            
+            req1 = team_reqs[t1.team_id]
+            req2 = team_reqs[t2.team_id]
+            mem1 = team_members[t1.team_id]
+            mem2 = team_members[t2.team_id]
+            
+            cov1 = coverage_score(team_vector([m.skill_vector for m in mem1]), req1)
+            cov2 = coverage_score(team_vector([m.skill_vector for m in mem2]), req2)
+            div1 = diversity_score(mem1)
+            div2 = diversity_score(mem2)
+            
+            base_score = cov1 + cov2 + (div1 + div2)*0.3
+            
+            # Try to swap one member from t1 with one from t2
+            best_swap = None
+            best_score = base_score
+            
+            for m1 in mem1:
+                for m2 in mem2:
+                    test_mem1 = [m for m in mem1 if m.id != m1.id] + [m2]
+                    test_mem2 = [m for m in mem2 if m.id != m2.id] + [m1]
+                    
+                    test_cov1 = coverage_score(team_vector([m.skill_vector for m in test_mem1]), req1)
+                    test_cov2 = coverage_score(team_vector([m.skill_vector for m in test_mem2]), req2)
+                    test_div1 = diversity_score(test_mem1)
+                    test_div2 = diversity_score(test_mem2)
+                    
+                    test_score = test_cov1 + test_cov2 + (test_div1 + test_div2)*0.3
+                    if test_score > best_score + 0.05: # Require meaningful improvement
+                        best_score = test_score
+                        best_swap = (m1, m2, test_cov1, test_cov2)
+            
+            if best_swap:
+                m1, m2, new_cov1, new_cov2 = best_swap
+                # Apply swap
+                t1.member_ids.remove(m1.id)
+                t1.member_ids.append(m2.id)
+                t2.member_ids.remove(m2.id)
+                t2.member_ids.append(m1.id)
+                mem1.remove(m1)
+                mem1.append(m2)
+                mem2.remove(m2)
+                mem2.append(m1)
+                swaps_made += 1
+                log.append(f"Swapped {m1.id} (Team {t1.name}) with {m2.id} (Team {t2.name}) -> Coverage improvement")
+    
+    log.append(f"Completed local optimization. Total swaps: {swaps_made}")
+
+    # Compute Team Formation Confidence Score
+    for team in teams:
+        mem = team_members[team.team_id]
+        cov = coverage_score(team_vector([m.skill_vector for m in mem]), team_reqs[team.team_id])
+        div = diversity_score(mem)
+        balance = 1.0 # simplified
+        confidence = (0.5 * cov) + (0.3 * div) + (0.2 * balance)
+        team.formation_confidence = min(confidence, 1.0)
+        team.coverage_score = cov
+        team.diversity_score = div
 
     return {
         "teams": teams,

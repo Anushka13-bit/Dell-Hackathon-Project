@@ -205,7 +205,7 @@ export default function RegistrationIntelligenceModule({
   const handleApprove = async () => {
     if (!selected) return;
     try {
-      const res = await fetch(`http://127.0.0.1:8000/participants/${selected.id}/approve`, { method: 'POST' });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/participants/${selected.id}/approve`, { method: 'POST' });
       if (!res.ok) throw new Error("Failed to approve");
       setRegistrations(prev => prev.map(r => r.id === selected.id ? { ...r, decision: 'AUTO_APPROVED' } : r));
     } catch (err) {
@@ -217,7 +217,7 @@ export default function RegistrationIntelligenceModule({
   const handleReject = async () => {
     if (!selected) return;
     try {
-      const res = await fetch(`http://127.0.0.1:8000/participants/${selected.id}/reject`, { method: 'POST' });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/participants/${selected.id}/reject`, { method: 'POST' });
       if (!res.ok) throw new Error("Failed to reject");
       setRegistrations(prev => prev.map(r => r.id === selected.id ? { ...r, decision: 'REJECTED' } : r));
     } catch (err) {

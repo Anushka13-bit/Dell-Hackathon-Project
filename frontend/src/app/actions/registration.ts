@@ -165,7 +165,7 @@ export async function submitRegistration(payload: SubmitRegistrationPayload) {
     if (payload.raw_text) {
       // Trigger background LLM parsing, await it to prevent Next.js from cancelling it
       try {
-        const r = await fetch('http://127.0.0.1:8000/participants/process_resume_background', {
+        const r = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/participants/process_resume_background`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ user_id: user.id, raw_text: payload.raw_text })
@@ -291,7 +291,7 @@ export async function createDirectProfile(payload: SubmitRegistrationPayload) {
   // 3. Trigger Background AI Task
   if (payload.raw_text) {
     try {
-      fetch('http://127.0.0.1:8000/participants/process_resume_background', {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/participants/process_resume_background`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: user.id, raw_text: payload.raw_text })

@@ -63,11 +63,24 @@ export default function LandingPage() {
             <Link href="/solutions" className="text-on-surface-variant hover:text-primary transition-colors text-body-md">Solutions</Link>
             <Link href="/documentation" className="text-on-surface-variant hover:text-primary transition-colors text-body-md">Documentation</Link>
           </div>
-          <div className="flex items-center gap-6">
-            <Link href="/auth/participant" className="hidden md:block text-on-surface-variant hover:text-primary transition-colors text-body-md font-medium">Participant Login</Link>
+          <div className="flex items-center gap-4 md:-mr-10 lg:-mr-16">
+            <Link href="/auth/participant" className="hidden md:block">
+              <button className="cursor-pointer text-on-surface-variant hover:text-primary transition-colors text-body-md font-medium px-2 py-2.5">
+                Participant Login
+              </button>
+            </Link>
+
+            <div className="hidden md:block w-px h-6 bg-outline-variant/50 mx-2"></div>
+
             <Link href="/auth/organizer">
-              <button className="bg-[rgb(73,99,95)] text-white px-6 py-2.5 rounded-xl font-label-md hover:bg-[rgb(63,89,85)] transition-all duration-300 shadow-sm hover:shadow-md">
+              <button className="cursor-pointer bg-[rgb(73,99,95)] text-white px-6 py-2.5 rounded-xl font-label-md hover:bg-[rgb(63,89,85)] transition-all duration-300 shadow-sm hover:shadow-md">
                 Organizer Login
+              </button>
+            </Link>
+
+            <Link href="/auth/reviewer" className="hidden md:block">
+              <button className="cursor-pointer border-2 border-secondary text-secondary px-5 py-2 rounded-xl font-label-md hover:bg-secondary/10 transition-all duration-300">
+                Reviewer Login
               </button>
             </Link>
           </div>

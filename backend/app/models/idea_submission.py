@@ -23,3 +23,6 @@ class IdeaSubmission(Base):
     submitted_at = Column(TIMESTAMP, nullable=True)
     updated_at = Column(TIMESTAMP, nullable=True)
     status = Column(VARCHAR(50), nullable=True)
+    
+    # Generated after evaluation
+    ai_feedback = Column(Text, nullable=True)

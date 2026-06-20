@@ -1,6 +1,28 @@
 "use client";
+import { useState } from "react";
 
 export default function HackathonReviewers() {
+  const [isAssigning, setIsAssigning] = useState(false);
+
+  const handleAutoAssign = async () => {
+    setIsAssigning(true);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/assignments/generate`, {
+        method: "POST",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        alert(`Successfully assigned ${data.count} reviewers!`);
+      } else {
+        alert("Failed to assign reviewers");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Error calling assignment optimizer");
+    } finally {
+      setIsAssigning(false);
+    }
+  };
   return (
     <div className="px-8 py-10 max-w-[1280px] mx-auto min-h-screen">
       {/* Metrics Section */}
@@ -58,6 +80,16 @@ export default function HackathonReviewers() {
             <div className="px-8 py-6 border-b border-outline-variant/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <h3 className="font-headline-sm text-[20px] font-bold">Reviewer Management</h3>
               <div className="flex items-center gap-3">
+                <button 
+                  onClick={handleAutoAssign}
+                  disabled={isAssigning}
+                  className="px-4 py-2 bg-primary text-white rounded-lg text-[14px] font-medium flex items-center gap-2 hover:bg-primary/90 transition-all disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[20px]">
+                    {isAssigning ? "hourglass_top" : "auto_awesome"}
+                  </span> 
+                  {isAssigning ? "Assigning..." : "Auto-Assign Reviewers"}
+                </button>
                 <button className="px-4 py-2 border border-outline-variant/50 rounded-lg text-[14px] font-medium flex items-center gap-2 hover:bg-surface-container-low transition-all">
                   <span className="material-symbols-outlined text-[20px]">filter_list</span> Filter
                 </button>

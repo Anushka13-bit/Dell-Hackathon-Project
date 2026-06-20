@@ -27,4 +27,5 @@ def get_db() -> Generator[Session, None, None]:
 def init_missing_tables() -> None:
     from .models.base import Base
     from .models import Participant, Reviewer, Team, Registration, Assignment, IdeaSubmission, ProblemStatement, UserRole, Evaluation, Hackathon
+    from .models.knowledge_base import KnowledgeDocument
     Base.metadata.create_all(bind=engine)

@@ -23,6 +23,7 @@ export default function HackathonLayout({
     { name: "Reviewers", href: `/organizer/hackathons/${id}/reviewers`, icon: "rate_review" },
     { name: "Evaluations", href: `/organizer/hackathons/${id}/evaluations`, icon: "assignment_turned_in" },
     { name: "Analytics", href: `/organizer/hackathons/${id}/analytics`, icon: "analytics" },
+    { name: "Promo Tools", href: `/organizer/hackathons/${id}/promo`, icon: "campaign" },
   ];
 
   return (

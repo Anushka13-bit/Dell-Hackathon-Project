@@ -1,4 +1,5 @@
 import ParticipantSidebar from "@/components/ParticipantSidebar";
+import Chatbot from "@/components/Chatbot";
 
 export default function ParticipantLayout({
   children,
@@ -13,6 +14,7 @@ export default function ParticipantLayout({
           {children}
         </main>
       </div>
+      <Chatbot />
     </div>
   );
 }

@@ -175,12 +175,20 @@ async def trigger_team_formation(background_tasks: BackgroundTasks):
             # 4. Save teams to DB
             for t in formed_teams:
                 team_id = uuid.uuid4()
-                member_ids = [m.id for m in t.members]
+                # Use getattr or properties from the Pydantic schema
+                member_ids = [m for m in getattr(t, "member_ids", [])] if not hasattr(t, "members") else [m.id for m in getattr(t, "members", [])]
+                if not member_ids and hasattr(t, "members"):
+                    member_ids = [m.id for m in t.members]
+                elif not member_ids:
+                    member_ids = t.member_ids
                 
                 new_team = Team(
                     team_id=team_id,
-                    name=f"{t.ps.title} Team",
-                    member_ids=member_ids
+                    name=f"{t.name}",
+                    member_ids=member_ids,
+                    coverage_score=getattr(t, "coverage_score", 0.0),
+                    diversity_score=getattr(t, "diversity_score", 0.0),
+                    formation_confidence=getattr(t, "formation_confidence", 0.0)
                 )
                 db.add(new_team)
                 

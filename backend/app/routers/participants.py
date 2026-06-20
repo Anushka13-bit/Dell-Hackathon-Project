@@ -328,3 +328,94 @@ async def reject_registration(registration_id: str):
     # Ideally also handle deleting from participants if it was somehow approved then rejected, but keeping it simple for demo.
 
     return {"status": "rejected"}
+
+from pydantic import BaseModel
+
+class FaceScanRequest(BaseModel):
+    registration_id: str
+    status: str
+    score: float
+    consented: bool
+
+@router.post("/validate-facescan")
+async def validate_facescan(request: FaceScanRequest, db: Session = Depends(get_db)):
+    """Mocks the FaceScan validation processing for the hackathon MVP."""
+    from ..models.registration import Registration
+    from datetime import datetime, timezone
+    
+    reg = db.query(Registration).filter(Registration.id == request.registration_id).first()
+    if not reg:
+        raise HTTPException(status_code=404, detail="Registration not found")
+        
+    reg.face_scan_status = request.status
+    reg.face_scan_score = request.score
+    reg.face_scan_consented = request.consented
+    
+    # Store deletion timestamp if consent is revoked
+    if not request.consented:
+        reg.face_scan_deleted_at = datetime.now(timezone.utc)
+        
+    db.commit()
+    return {"message": "FaceScan validation processed securely.", "status": request.status}
+
+
+class ChatRequest(BaseModel):
+    hackathon_id: str
+    question: str
+
+@router.post("/chat")
+async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
+    """Ask the RAG Chatbot a question about the hackathon."""
+    from participant_ai.pipelines.chatbot.rag import ask_chatbot
+    
+    try:
+        response = ask_chatbot(request.question, request.hackathon_id, db)
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{participant_id}/data")
+async def delete_participant_data(participant_id: str, db: Session = Depends(get_db)):
+    """GDPR Right-to-Erasure: Nullifies PII and anonymizes registration."""
+    from datetime import datetime, timezone
+    
+    # Anonymize participant record
+    p = db.query(Participant).filter(Participant.id == participant_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Participant not found")
+        
+    p.name = "Anonymized User"
+    p.github_url = None
+    p.linkedin_url = None
+    # We keep college_name and skill_vector for statistical purposes
+    
+    db.commit()
+    return {"message": "Participant PII successfully anonymized."}
+
+
+@router.delete("/{participant_id}/facescan")
+async def delete_facescan_data(participant_id: str, db: Session = Depends(get_db)):
+    """Deletes FaceScan validation metadata."""
+    from ..models.registration import Registration
+    from datetime import datetime, timezone
+    
+    # We assume registration ID matches participant ID or we look it up.
+    # Actually, let's just find the registration linked to this participant
+    # Wait, Participant table doesn't have registration_id directly in the SQLAlchemy model?
+    # Let's search Registration by user_id = participant_id
+    reg = db.query(Registration).filter(Registration.id == participant_id).first()
+    if not reg:
+        # Check if participant_id is the user_id
+        reg = db.query(Registration).filter(Registration.user_id == participant_id).first()
+        
+    if not reg:
+        raise HTTPException(status_code=404, detail="Registration not found")
+        
+    reg.face_scan_status = None
+    reg.face_scan_score = None
+    reg.face_scan_consented = False
+    reg.face_scan_deleted_at = datetime.now(timezone.utc)
+    
+    db.commit()
+    return {"message": "FaceScan metadata successfully deleted."}

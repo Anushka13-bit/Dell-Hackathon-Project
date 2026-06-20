@@ -11,7 +11,7 @@ export default function CreateHackathonStep1() {
   const handleNext = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://127.0.0.1:8000/hackathons/', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/hackathons/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(basicInfo)

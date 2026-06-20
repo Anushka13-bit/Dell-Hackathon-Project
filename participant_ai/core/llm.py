@@ -52,6 +52,7 @@ async def call_json_async(prompt: str) -> dict:
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
         raise LLMCallError("GROQ_API_KEY environment variable is missing")
+    client = AsyncGroq(api_key=api_key)
 
     for attempt in range(_MAX_RETRIES + 1):
         try:

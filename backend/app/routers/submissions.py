@@ -31,6 +31,7 @@ class SubmissionOut(BaseModel):
     idea_vector: Optional[dict] = None
     submitted_at: Optional[str] = None
     status: Optional[str] = None
+    ai_feedback: Optional[str] = None
 
     class Config:
         from_attributes = True

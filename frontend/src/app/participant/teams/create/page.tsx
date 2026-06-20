@@ -3,10 +3,58 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useOnboardingStore } from "@/store/useOnboardingStore";
+
+const MOCK_PARTICIPANTS = [
+  {
+    id: "p1",
+    name: "Alex Rivera",
+    avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuCEo20hrQSF2YwwJS4Ye6B9OV12dT1HKGMTA_Ve13ZF1kqyHYbl-qk8jbZKq35_fPbv6v3kb6Q8Q0e2PR9BYATQ7AtKp5fQZYab5C2eJKCA5V1_k84icV4JlehdKbVGL0L4N9NWSJ7Yf_dLvrUrqUUKzzWCLP6x48MnbtyxVbVZLMzPISgtav3qyvjyo8xutGO01T-u0ak5lBmRdNI6_CoFd2Ho_Ou8HVVM_Erfu2Mg51cBVehmQH_r5AsDJHVgKRePb9FO6UarPY8",
+    skills: ["TensorFlow", "Rust", "MLOps"],
+    skill_vector: { ai_ml: 0.9, backend: 0.8, hardware: 0.3 } as Record<string, number>
+  },
+  {
+    id: "p2",
+    name: "Jordan Chen",
+    avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuA5-WSK9nwbsH03xvjPu3LdIislU7f8HM9ABzU_pqrFjgp-7jjXWRKzxjeyV8YQJuvAKuts8JXpIOTtrxFfWXiHoqW1WoIqlpleSmvI__qCmWOwfpkGLpB85tDfIGEQS0b0pK-a9d6GtDIfb6We51nIDcKUaBNhzI28bGFlIH4lmOWrnmPEQeBth7l4UrBHd0XJyEvKILwGQQOFk8MjdK25CwazyXF1atpAULSOoHBmOp4bGfjc_cYuDOX9rJQxVNangaph7vJFbLk",
+    skills: ["Go", "Distributed Systems", "PostgreSQL"],
+    skill_vector: { backend: 0.9, cloud: 0.8, database: 0.9 } as Record<string, number>
+  },
+  {
+    id: "p3",
+    name: "Samira Tariq",
+    avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuCy6hLar6lVOcFsOiDN0W40PpfburCY8toVgMujwoyT-x1w9auzVkVjN7BVvJc8V665ZoVcMRvlH_-qrenXGlQN-rfcF-x4eVwry6uhkT9Btn-f0q8gKWs4hcm0cWiazxqXakf8Fikbq7NrFeuoZPGNoXkFnNxUAEsNq7PMlFNY5julvEMr4F99Er9RFO_ZVRJXKAWpynPlZk5eQRz_rRVoq0hKGAK-GDdQ92ud2gD3DhAKhNnTrtMYwv2nhiAYgNfwrOhksxnO0r8",
+    skills: ["Figma", "React", "User Research"],
+    skill_vector: { ui_ux: 0.9, frontend: 0.7, design: 0.9 } as Record<string, number>
+  }
+];
+
+// In a real scenario, this is derived from the team's needs + problem statement
+const TEAM_REQUIRED_VECTOR: Record<string, number> = { ai_ml: 0.8, backend: 0.6, ui_ux: 0.5 };
+
+function calculateRecruitMatch(participantVector: Record<string, number>, requiredVector: Record<string, number>) {
+  let score = 0;
+  let maxPossible = 0;
+  
+  for (const [skill, weight] of Object.entries(requiredVector)) {
+    maxPossible += weight;
+    if (participantVector[skill]) {
+      score += participantVector[skill] * weight;
+    }
+  }
+  
+  if (maxPossible === 0) return 0;
+  return Math.round((score / maxPossible) * 100);
+}
 
 export default function CreateTeam() {
   const [teamSize, setTeamSize] = useState(4);
   const [activeTab, setActiveTab] = useState("Invite Friends");
+
+  const sortedRecruits = [...MOCK_PARTICIPANTS].map(p => ({
+    ...p,
+    matchScore: calculateRecruitMatch(p.skill_vector, TEAM_REQUIRED_VECTOR)
+  })).sort((a, b) => b.matchScore - a.matchScore);
 
   return (
     <>
@@ -165,43 +213,25 @@ export default function CreateTeam() {
                 <h2 className="font-headline-sm text-[24px] text-primary">AI Matchmaking</h2>
               </div>
               <div className="space-y-4 overflow-y-auto max-h-[400px] pr-2">
-                {/* Recommendation Card */}
-                <div className="bg-white p-4 rounded-xl border border-outline-variant/20 hover:border-primary/50 transition-all group">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <img className="w-12 h-12 rounded-lg object-cover bg-surface-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCEo20hrQSF2YwwJS4Ye6B9OV12dT1HKGMTA_Ve13ZF1kqyHYbl-qk8jbZKq35_fPbv6v3kb6Q8Q0e2PR9BYATQ7AtKp5fQZYab5C2eJKCA5V1_k84icV4JlehdKbVGL0L4N9NWSJ7Yf_dLvrUrqUUKzzWCLP6x48MnbtyxVbVZLMzPISgtav3qyvjyo8xutGO01T-u0ak5lBmRdNI6_CoFd2Ho_Ou8HVVM_Erfu2Mg51cBVehmQH_r5AsDJHVgKRePb9FO6UarPY8" alt="Alex" />
-                      <div>
-                        <h3 className="font-label-md font-bold text-on-surface">Alex Rivera</h3>
-                        <p className="text-[12px] text-tertiary font-bold">98% Match</p>
+                {sortedRecruits.map((recruit) => (
+                  <div key={recruit.id} className="bg-white p-4 rounded-xl border border-outline-variant/20 hover:border-primary/50 transition-all group">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <img className="w-12 h-12 rounded-lg object-cover bg-surface-variant" src={recruit.avatar} alt={recruit.name} />
+                        <div>
+                          <h3 className="font-label-md font-bold text-on-surface">{recruit.name}</h3>
+                          <p className="text-[12px] text-tertiary font-bold">{recruit.matchScore}% Match</p>
+                        </div>
                       </div>
+                      <button className="bg-primary text-white text-[12px] px-3 py-1.5 rounded-full font-bold hover:scale-105 transition-transform">Invite</button>
                     </div>
-                    <button className="bg-primary text-white text-[12px] px-3 py-1.5 rounded-full font-bold hover:scale-105 transition-transform">Invite</button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="text-[10px] px-2 py-1 bg-surface-container-low rounded-md">TensorFlow</span>
-                    <span className="text-[10px] px-2 py-1 bg-surface-container-low rounded-md">Rust</span>
-                    <span className="text-[10px] px-2 py-1 bg-surface-container-low rounded-md">MLOps</span>
-                  </div>
-                </div>
-
-                {/* Recommendation Card */}
-                <div className="bg-white p-4 rounded-xl border border-outline-variant/20 hover:border-primary/50 transition-all group">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <img className="w-12 h-12 rounded-lg object-cover bg-surface-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5-WSK9nwbsH03xvjPu3LdIislU7f8HM9ABzU_pqrFjgp-7jjXWRKzxjeyV8YQJuvAKuts8JXpIOTtrxFfWXiHoqW1WoIqlpleSmvI__qCmWOwfpkGLpB85tDfIGEQS0b0pK-a9d6GtDIfb6We51nIDcKUaBNhzI28bGFlIH4lmOWrnmPEQeBth7l4UrBHd0XJyEvKILwGQQOFk8MjdK25CwazyXF1atpAULSOoHBmOp4bGfjc_cYuDOX9rJQxVNangaph7vJFbLk" alt="Jordan" />
-                      <div>
-                        <h3 className="font-label-md font-bold text-on-surface">Jordan Chen</h3>
-                        <p className="text-[12px] text-tertiary font-bold">92% Match</p>
-                      </div>
+                    <div className="flex flex-wrap gap-2">
+                      {recruit.skills.map((skill) => (
+                        <span key={skill} className="text-[10px] px-2 py-1 bg-surface-container-low rounded-md">{skill}</span>
+                      ))}
                     </div>
-                    <button className="bg-primary text-white text-[12px] px-3 py-1.5 rounded-full font-bold hover:scale-105 transition-transform">Invite</button>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="text-[10px] px-2 py-1 bg-surface-container-low rounded-md">Go</span>
-                    <span className="text-[10px] px-2 py-1 bg-surface-container-low rounded-md">Distributed Systems</span>
-                    <span className="text-[10px] px-2 py-1 bg-surface-container-low rounded-md">PostgreSQL</span>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
 

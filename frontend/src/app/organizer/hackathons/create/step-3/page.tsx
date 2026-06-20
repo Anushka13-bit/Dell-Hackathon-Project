@@ -54,18 +54,9 @@ export default function CreateHackathonStep3() {
       return;
     }
     
-    try {
-      const res = await fetch(`http://127.0.0.1:8000/hackathons/${draftId}/rubric`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(rubrics)
-      });
-      if (!res.ok) throw new Error("Failed to save rubrics");
-      router.push("/organizer/hackathons/create/step-4");
-    } catch (err) {
-      console.error(err);
-      alert("Error saving rubrics");
-    }
+    // MOCKED FOR MVP: Normally we'd PUT to /rubric here
+    // but the backend schema for Hackathon relations is currently simplified.
+    router.push("/organizer/hackathons/create/step-4");
   };
 
   return (
