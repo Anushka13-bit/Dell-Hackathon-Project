@@ -8,6 +8,9 @@ from sqlalchemy.orm import Session
 from ..deps import get_db
 from ..models.hackathon import Hackathon
 
+from uuid import UUID
+from datetime import date
+
 router = APIRouter()
 
 
@@ -21,11 +24,11 @@ class HackathonCreate(BaseModel):
 
 
 class HackathonOut(BaseModel):
-    id: str
+    id: UUID
     title: str
     description: Optional[str] = None
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
 
     class Config:
         from_attributes = True
