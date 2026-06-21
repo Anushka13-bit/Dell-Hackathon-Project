@@ -9,7 +9,9 @@ export async function GET() {
     github: 'anushka',
     gender: 'Female',
     skills: ['React'],
-    raw_text: 'Test resume text'
+    raw_text: 'Test resume text',
+    degree: 'Bachelors',
+    phone: '1234567890'
   };
   
   try {

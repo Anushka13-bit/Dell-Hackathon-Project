@@ -99,18 +99,23 @@ async def create_assignment(data: AssignmentCreate, db: Session = Depends(get_db
 
 
 @router.post("/generate")
-def generate_assignments():
+def generate_assignments(payload: dict = None):
     """
-    Queue reviewer assignment generation in the background.
+    Run reviewer assignment generation.
     """
-
-    task = reviewer_assignment_task.delay()
-
-    return {
-        "status": "queued",
-        "message": "Reviewer assignment pipeline started",
-        "task_id": task.id
-    }
+    from app.services.reviewer_assignment.assignment.persist_assignment import persist_assignments
+    try:
+        hackathon_id = payload.get("hackathon_id") if payload else None
+        # Run synchronously for local development
+        persist_assignments(hackathon_id)
+        return {
+            "status": "completed",
+            "message": "Reviewer assignment pipeline completed"
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/", response_model=List[AssignmentOut])

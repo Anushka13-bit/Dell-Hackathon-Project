@@ -214,9 +214,10 @@ def _recalculate_team_metrics(db: Session, team: Team) -> None:
         team.formation_confidence = 0.0
         return
 
+    raw_ids = [str(member_id) for member_id in member_ids]
     participants = (
         db.query(Participant)
-        .filter(Participant.id.in_([str(member_id) for member_id in member_ids]))
+        .filter((Participant.id.in_(raw_ids)) | (Participant.user_id.in_(raw_ids)))
         .all()
     )
     if not participants:
@@ -262,14 +263,18 @@ def get_valid_team_member_ids(db: Session, team: Team) -> list[str]:
         (Participant.id.in_(raw_ids)) | (Participant.user_id.in_(raw_ids))
     ).all()
     
-    found_ids = set()
-    for p in participants:
-        if str(p.id) in raw_ids:
-            found_ids.add(str(p.id))
-        if p.user_id and str(p.user_id) in raw_ids:
-            found_ids.add(str(p.user_id))
+    valid_ids = []
+    seen = set()
+    for raw_id in raw_ids:
+        for p in participants:
+            if str(p.id) == raw_id or (p.user_id and str(p.user_id) == raw_id):
+                pid = str(p.id)
+                if pid not in seen:
+                    seen.add(pid)
+                    valid_ids.append(pid)
+                break
             
-    return [member_id for member_id in raw_ids if member_id in found_ids]
+    return valid_ids
 
 
 def build_team_schema(team: Team, max_team_size: int, db: Session):

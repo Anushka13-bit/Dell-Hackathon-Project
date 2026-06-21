@@ -93,6 +93,7 @@ async def get_bias_report():
 # --------------- Pydantic schemas ---------------
 
 class EvaluationCreate(BaseModel):
+    hackathon_id: Optional[str] = None
     assignment_id: Optional[str] = None
     reviewer_id: str
     idea_id: str
@@ -102,6 +103,7 @@ class EvaluationCreate(BaseModel):
 
 class EvaluationOut(BaseModel):
     evaluation_id: UUID
+    hackathon_id: Optional[UUID] = None
     assignment_id: Optional[UUID] = None
     reviewer_id: Optional[UUID] = None
     idea_id: Optional[UUID] = None
@@ -116,12 +118,14 @@ class EvaluationOut(BaseModel):
 
 
 # --------------- CRUD endpoints ---------------
+from ..models.assignment import Assignment
 
 @router.post("/evaluate", response_model=EvaluationOut)
 async def create_evaluation(data: EvaluationCreate, db: Session = Depends(get_db)):
     """Store evaluation scores and feedback."""
     evaluation = Evaluation(
         evaluation_id=uuid.uuid4(),
+        hackathon_id=data.hackathon_id,
         assignment_id=data.assignment_id,
         reviewer_id=data.reviewer_id,
         idea_id=data.idea_id,

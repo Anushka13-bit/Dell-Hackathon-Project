@@ -1,7 +1,7 @@
 import uuid
 from uuid import UUID
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -20,7 +20,7 @@ class SubmissionCreate(BaseModel):
     ps_id: Optional[str] = None
     title: str
     description: Optional[str] = None
-    idea_vector: Optional[dict] = None
+    idea_vector: Optional[Any] = None
     github_url: Optional[str] = None
     ppt_url: Optional[str] = None
     video_url: Optional[str] = None
@@ -33,7 +33,7 @@ class SubmissionOut(BaseModel):
 
     title: Optional[str] = None
     description: Optional[str] = None
-    idea_vector: Optional[dict] = None
+    idea_vector: Optional[Any] = None
     github_url: Optional[str] = None
     ppt_url: Optional[str] = None
     video_url: Optional[str] = None

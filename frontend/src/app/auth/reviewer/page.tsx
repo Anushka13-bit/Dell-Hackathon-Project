@@ -333,7 +333,7 @@ const submitReview = async () => {
                 <div className="grid grid-cols-1 gap-4">
                   {submissions.map((s, index) => (
                     <motion.button
-                      key={s.id}
+                      key={s.assignment_id}
                       initial={{
                         opacity: 0,
                         y: 20,

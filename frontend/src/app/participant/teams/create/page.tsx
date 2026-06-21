@@ -83,7 +83,9 @@ export default function CreateTeam() {
       console.error("Auto-save failed", e);
     }
 
-    setToastMessage(`${recruit.name} has accepted the invite!`);
+    await loadTeam();
+
+    setToastMessage(`${recruit.name} was added to the team!`);
     setTimeout(() => {
       setToastMessage(null);
     }, 3000);
@@ -124,6 +126,43 @@ export default function CreateTeam() {
   const [teamCoverage, setTeamCoverage] = useState(0);
   const [teamMembers, setTeamMembers] = useState<{id: string, name: string}[]>([]);
 
+  const loadTeam = async () => {
+    const apiBase = getApiBaseUrl();
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user?.id) return;
+    
+    try {
+      const pRes = await fetch(`${apiBase}/participants/${session.user.id}`);
+      if (!pRes.ok) return;
+      const pData = await pRes.json();
+      
+      if (pData.team_id) {
+        const tRes = await fetch(`${apiBase}/teams/${pData.team_id}`);
+        if (tRes.ok) {
+          const tData = await tRes.json();
+          setTeamCoverage(Math.round(tData.coverage_score || 0));
+          
+          if (tData.member_ids && tData.member_ids.length > 0) {
+            const members = [];
+            for (const mid of tData.member_ids) {
+              const mRes = await fetch(`${apiBase}/participants/${mid}`);
+              if (mRes.ok) {
+                const mData = await mRes.json();
+                members.push({ id: mData.id, name: mData.name || 'Unknown' });
+              }
+            }
+            setTeamMembers(members);
+          }
+        }
+      } else {
+        setTeamMembers([{ id: pData.id, name: pData.name || 'You' }]);
+      }
+    } catch (e) {
+      console.error("Failed to load team data:", e);
+    }
+  };
+
   useEffect(() => {
     const apiBase = getApiBaseUrl();
     setLoadingRecruits(true);
@@ -133,41 +172,6 @@ export default function CreateTeam() {
       .catch((e) => console.error("Failed to load participants:", e))
       .finally(() => setLoadingRecruits(false));
 
-    async function loadTeam() {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) return;
-      
-      try {
-        const pRes = await fetch(`${apiBase}/participants/${session.user.id}`);
-        if (!pRes.ok) return;
-        const pData = await pRes.json();
-        
-        if (pData.team_id) {
-          const tRes = await fetch(`${apiBase}/teams/${pData.team_id}`);
-          if (tRes.ok) {
-            const tData = await tRes.json();
-            setTeamCoverage(Math.round(tData.coverage_score || 0));
-            
-            if (tData.member_ids && tData.member_ids.length > 0) {
-              const members = [];
-              for (const mid of tData.member_ids) {
-                const mRes = await fetch(`${apiBase}/participants/${mid}`);
-                if (mRes.ok) {
-                  const mData = await mRes.json();
-                  members.push({ id: mData.id, name: mData.name || 'Unknown' });
-                }
-              }
-              setTeamMembers(members);
-            }
-          }
-        } else {
-          setTeamMembers([{ id: pData.id, name: pData.name || 'You' }]);
-        }
-      } catch (e) {
-        console.error("Failed to load team data:", e);
-      }
-    }
     loadTeam();
   }, []);
 
@@ -320,9 +324,9 @@ export default function CreateTeam() {
                         {member.name}
                       </div>
                     ))}
-                    {recruits.filter(r => invitedMemberIds.includes(r.id)).map((member) => (
+                    {recruits.filter(r => invitedMemberIds.includes(r.id) && !teamMembers.find(m => m.id === r.id)).map((member) => (
                       <div key={member.id} className="font-label-md text-on-surface px-3 py-2 bg-surface-container-low border border-primary/20 rounded-md flex justify-between items-center">
-                        <span>{member.name} <span className="text-[12px] text-tertiary ml-2">(Invited)</span></span>
+                        <span>{member.name} <span className="text-[12px] text-tertiary ml-2">(Added)</span></span>
                         <button 
                           onClick={() => setInvitedMemberIds(prev => prev.filter(id => id !== member.id))}
                           className="text-on-surface-variant hover:text-error transition-colors flex items-center"

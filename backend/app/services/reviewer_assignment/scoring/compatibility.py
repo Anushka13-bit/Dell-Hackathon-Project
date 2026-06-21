@@ -5,6 +5,9 @@ def calculate_compatibility(
 
     score = 0.0
 
+    if not isinstance(idea_vector, dict) or not isinstance(reviewer_vector, dict):
+        return 0.0
+
     for category, idea_weight in idea_vector.items():
 
         reviewer_score = reviewer_vector.get(

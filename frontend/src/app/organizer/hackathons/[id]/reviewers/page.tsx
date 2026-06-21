@@ -6,6 +6,8 @@ export default function HackathonReviewers() {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedReviewer, setSelectedReviewer] = useState<any>(null);
+  const [isTeamsModalOpen, setIsTeamsModalOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -41,6 +43,22 @@ export default function HackathonReviewers() {
       setIsAssigning(false);
     }
   };
+
+  const handleExportCSV = useCallback(() => {
+    const headers = ["Name,Email,Expertise,Assigned Teams"];
+    const rows = reviewers.map(r => {
+      const reviewerAssignments = assignments.filter((a) => a.reviewer_id === r.reviewer_id);
+      return `"${r.name}","${r.email || ''}","${r.primary_specialization || 'General'}","${reviewerAssignments.length}"`;
+    });
+    const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "reviewers_export.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, [reviewers, assignments]);
 
   return (
     <div className="px-8 py-10 max-w-[1280px] mx-auto min-h-screen">
@@ -109,20 +127,14 @@ export default function HackathonReviewers() {
                   </span>
                   {isAssigning ? 'Optimizing...' : 'Run Optimizer'}
                 </button> 
-                <button
-                  className="px-4 py-2 bg-primary text-white rounded-lg text-[14px] font-medium flex items-center gap-2 hover:bg-primary/90 transition-all"
-                >
-                  <span className="material-symbols-outlined text-[20px]">
-                    person_add
-                  </span>
-                  Add Reviewer
-                </button> 
-                <button className="px-4 py-2 border border-outline-variant/50 rounded-lg text-[14px] font-medium flex items-center gap-2 hover:bg-surface-container-low transition-all">
+                <div className="flex items-center gap-3">
+                <button onClick={() => alert("Filter clicked")} className="px-4 py-2 border border-outline-variant/50 rounded-lg text-[14px] font-medium flex items-center gap-2 hover:bg-surface-container-low transition-all">
                   <span className="material-symbols-outlined text-[20px]">filter_list</span> Filter
                 </button>
-                <button className="px-4 py-2 border border-outline-variant/50 rounded-lg text-[14px] font-medium flex items-center gap-2 hover:bg-surface-container-low transition-all">
+                <button onClick={handleExportCSV} className="px-4 py-2 border border-outline-variant/50 rounded-lg text-[14px] font-medium flex items-center gap-2 hover:bg-surface-container-low transition-all">
                   <span className="material-symbols-outlined text-[20px]">download</span> Export CSV
                 </button>
+                </div>
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -171,7 +183,15 @@ export default function HackathonReviewers() {
                           <td className="px-4 py-5 text-center text-primary font-bold">0</td>
                           <td className="px-4 py-5 text-center font-bold">-</td>
                           <td className="px-8 py-5 text-center ">
-                            <button className="text-primary hover:text-primary/70 font-bold text-[12px] flex items-center gap-1 inline-flex"><span className="material-symbols-outlined text-[16px]">visibility</span>Teams</button>
+                            <button 
+                              onClick={() => {
+                                setSelectedReviewer(reviewer);
+                                setIsTeamsModalOpen(true);
+                              }}
+                              className="text-primary hover:text-primary/70 font-bold text-[12px] flex items-center gap-1 inline-flex"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">visibility</span>Teams
+                            </button>
                           </td>
                         </tr>
                       );
@@ -181,13 +201,13 @@ export default function HackathonReviewers() {
               </table>
             </div>
             <div className="px-8 py-4 bg-surface-container-low/30 border-t border-outline-variant/20 flex items-center justify-between">
-              <p className="text-[12px] text-on-surface-variant font-medium">Showing 3 of 42 reviewers</p>
+              <p className="text-[12px] text-on-surface-variant font-medium">Showing {reviewers.length} reviewers</p>
               <div className="flex items-center gap-2">
                 <button className="p-1.5 rounded border border-outline-variant/30 hover:bg-white text-outline transition-all disabled:opacity-30 flex items-center justify-center" disabled>
                   <span className="material-symbols-outlined text-[18px]">chevron_left</span>
                 </button>
-                <span className="text-[12px] font-bold px-2">Page 1 of 14</span>
-                <button className="p-1.5 rounded border border-outline-variant/30 hover:bg-white text-on-surface transition-all flex items-center justify-center">
+                <span className="text-[12px] font-bold px-2">Page 1 of 1</span>
+                <button className="p-1.5 rounded border border-outline-variant/30 hover:bg-white text-on-surface transition-all flex items-center justify-center disabled:opacity-30" disabled>
                   <span className="material-symbols-outlined text-[18px]">chevron_right</span>
                 </button>
               </div>
@@ -240,6 +260,32 @@ export default function HackathonReviewers() {
           
         </aside>
       </div>
+
+      {isTeamsModalOpen && selectedReviewer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">Teams for {selectedReviewer.name}</h3>
+              <button onClick={() => setIsTeamsModalOpen(false)} className="text-outline hover:text-on-surface">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <div className="space-y-3 overflow-y-auto pr-2">
+              {assignments.filter(a => a.reviewer_id === selectedReviewer.reviewer_id).length === 0 ? (
+                <p className="text-on-surface-variant">No teams assigned yet.</p>
+              ) : (
+                assignments.filter(a => a.reviewer_id === selectedReviewer.reviewer_id).map(a => (
+                  <div key={a.assignment_id} className="p-3 border border-outline-variant/30 rounded-lg">
+                    <p className="text-sm font-bold">Idea ID: <span className="font-normal text-outline break-all">{a.idea_id}</span></p>
+                    <p className="text-xs text-outline mt-1">Assignment ID: {a.assignment_id}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

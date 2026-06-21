@@ -41,7 +41,7 @@ export default function HackathonTeams() {
   const recruiting = teams.filter(t => (t.member_ids?.length || 0) < 4).length;
   const complete = teams.filter(t => (t.member_ids?.length || 0) >= 4).length;
   const totalSubmissions = submissions.length;
-  const missingSkills = teams.filter(t => (t.coverage_score || 0) < 0.5).length;
+  const missingSkills = teams.filter(t => (t.coverage_score || 0) < 50).length;
   const submissionPercentage = totalTeams ? Math.round((totalSubmissions / totalTeams) * 100) : 0;
 
   return (
@@ -292,7 +292,7 @@ export default function HackathonTeams() {
                   )}
                   {!isLoading && teams.map(t => {
                     const memberCount = t.member_ids?.length || 0;
-                    const coverageScore = Math.round((t.coverage_score || 0) * 100);
+                    const coverageScore = Math.round(t.coverage_score || 0);
                     const healthStatus = memberCount >= 4 ? 'Healthy' : memberCount > 0 ? 'Recruiting' : 'At Risk';
                     const healthColor = healthStatus === 'Healthy' ? 'bg-primary' : healthStatus === 'Recruiting' ? 'bg-secondary' : 'bg-error';
                     const healthBg = healthStatus === 'Healthy' ? 'bg-primary/10 text-primary' : healthStatus === 'Recruiting' ? 'bg-secondary-container/30 text-on-secondary-container' : 'bg-error-container/30 text-error';

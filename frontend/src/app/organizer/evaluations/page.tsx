@@ -285,7 +285,7 @@ export default function OrganizerEvaluations() {
               </table>
             </div>
             <div className="p-4 bg-surface-container-lowest border-t border-outline-variant flex justify-center">
-              <button className="text-[14px] text-primary font-bold hover:underline">View All 112 Teams</button>
+              <button className="text-[14px] text-primary font-bold hover:underline">View All Teams</button>
             </div>
           </div>
         </div>
