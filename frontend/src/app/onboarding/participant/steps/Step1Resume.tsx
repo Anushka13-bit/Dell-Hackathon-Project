@@ -44,6 +44,7 @@ export default function Step1Resume() {
             fullName: parsed.name || "",
             email: parsed.email || "",
             phone: parsed.phone || "",
+            gender: parsed.gender || "",
             collegeInfo: {
                 college: parsed.college_name || "",
                 degree: parsed.degree || "",

@@ -37,8 +37,10 @@ export function QuickProfileCreator() {
           name: parsed.name || "",
           email: parsed.email || "",
           college: parsed.college_name || "N/A",
+          degree: parsed.degree || "N/A",
           github: parsed.github_url || "N/A",
-          gender: "Prefer not to say",
+          gender: parsed.gender || "Prefer not to say",
+          phone: parsed.phone || "N/A",
           skills: parsed.raw_skills || [],
           skill_vector: data.skill_vector || {},
           raw_text: data.raw_text || ""
@@ -49,7 +51,7 @@ export function QuickProfileCreator() {
         }
         
         setUploadText("Profile Created!");
-        // The server action calls revalidatePath, so the page should refresh itself shortly!
+        window.location.reload();
     } catch (error: any) {
         console.error("Failed to process resume:", error);
         setErrorText(error.message || "Failed to process resume");

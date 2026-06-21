@@ -258,16 +258,32 @@ export default function ReviewerDashboard() {
              exit={{ opacity: 0, y: -10 }}
              transition={{ duration: 0.3 }}
            >
-             <div className="mb-10">
-               <span className="inline-block bg-secondary/10 text-secondary px-4 py-1.5 rounded-full text-[11px] font-bold tracking-wide mb-4">
-                 REVIEWER DASHBOARD
-               </span>
-               <h1 className="font-headline-md text-[28px] md:text-[32px] mb-2 tracking-tight">
-                 Your Assigned Hackathons
-               </h1>
-               <p className="text-on-surface-variant text-[16px]">
-                 Select a hackathon to review team submissions.
-               </p>
+             <div className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+               <div>
+                 <span className="inline-block bg-secondary/10 text-secondary px-4 py-1.5 rounded-full text-[11px] font-bold tracking-wide mb-4">
+                   REVIEWER DASHBOARD
+                 </span>
+                 <h1 className="font-headline-md text-[28px] md:text-[32px] mb-2 tracking-tight">
+                   Your Assigned Hackathons
+                 </h1>
+                 <p className="text-on-surface-variant text-[16px]">
+                   Select a hackathon to review team submissions.
+                 </p>
+               </div>
+               {/* Gamification Widget */}
+               <div className="bg-white/80 backdrop-blur-xl border border-white/50 p-4 rounded-2xl flex items-center gap-4 shadow-sm">
+                 <div className="relative w-12 h-12">
+                   <svg className="w-full h-full transform -rotate-90">
+                     <circle className="text-surface-container-high" cx="24" cy="24" fill="transparent" r="20" stroke="currentColor" strokeWidth="4"></circle>
+                     <circle className="text-secondary" cx="24" cy="24" fill="transparent" r="20" stroke="currentColor" strokeDasharray="125" strokeDashoffset="15" strokeWidth="4" strokeLinecap="round"></circle>
+                   </svg>
+                   <span className="absolute inset-0 flex items-center justify-center font-bold text-secondary text-[12px]">88%</span>
+                 </div>
+                 <div>
+                   <p className="text-[10px] uppercase tracking-widest font-bold text-on-surface-variant">Consistency Rank</p>
+                   <p className="font-headline-sm text-[16px] text-on-surface">Top 15% Reviewer</p>
+                 </div>
+               </div>
              </div>
  
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

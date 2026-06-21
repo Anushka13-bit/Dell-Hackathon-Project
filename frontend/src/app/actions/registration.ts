@@ -11,8 +11,10 @@ export type SubmitRegistrationPayload = {
   name: string
   email: string
   college: string
+  degree: string
   github: string
   gender: string
+  phone: string
   skills?: string[]
   hackathon_id?: string
   faceScanConsented?: boolean
@@ -84,8 +86,10 @@ export async function submitRegistration(payload: SubmitRegistrationPayload) {
     name: payload.name,
     email: payload.email,
     college: payload.college,
+    degree: payload.degree,
     github: payload.github,
     gender: payload.gender,
+    phone: payload.phone,
     skills: payload.skills || [],
     
     decision: decision,
@@ -138,8 +142,10 @@ export async function submitRegistration(payload: SubmitRegistrationPayload) {
       name: payload.name,
       email: payload.email,
       college_name: payload.college,
+      degree: payload.degree,
       github_url: payload.github,
       gender: payload.gender,
+      phone: payload.phone,
       declared_skills: payload.skills || [],
       skill_vector: payload.raw_text ? { status: "processing" } : (payload.skill_vector || {}),
       status: 'approved'
@@ -245,8 +251,10 @@ export async function createDirectProfile(payload: SubmitRegistrationPayload) {
     name: payload.name || user.email?.split('@')[0] || "Unknown",
     email: payload.email || user.email,
     college: payload.college || "N/A",
+    degree: payload.degree || "N/A",
     github: payload.github || "N/A",
     gender: payload.gender || "Prefer not to say",
+    phone: payload.phone || "N/A",
     skills: payload.skills || [],
     decision: 'AUTO_APPROVED',
     score: 0.1,
@@ -259,12 +267,23 @@ export async function createDirectProfile(payload: SubmitRegistrationPayload) {
     recommendation: 'Direct profile creation fallback'
   }
 
-  const { error: regError } = await supabase.from('registrations').insert(dbPayload)
-  if (regError) {
-    // If it exists, that's fine, we will just proceed
-    if (regError.code !== '23505') {
-      console.error("Direct registration failed:", regError);
-      return { success: false, error: regError.message }
+  const { data: existingReg } = await supabase.from('registrations').select('id').eq('user_id', user.id).single()
+
+  if (existingReg) {
+    registrationId = existingReg.id
+    const { id, ...updatePayload } = dbPayload
+    const { error: updateRegError } = await supabase.from('registrations').update(updatePayload).eq('id', registrationId)
+    if (updateRegError) {
+      console.error("Direct registration update failed:", updateRegError);
+      return { success: false, error: updateRegError.message }
+    }
+  } else {
+    const { error: regError } = await supabase.from('registrations').insert(dbPayload)
+    if (regError) {
+      if (regError.code !== '23505') {
+        console.error("Direct registration failed:", regError);
+        return { success: false, error: regError.message }
+      }
     }
   }
 
@@ -275,17 +294,40 @@ export async function createDirectProfile(payload: SubmitRegistrationPayload) {
     name: dbPayload.name,
     email: dbPayload.email,
     college_name: dbPayload.college,
+    degree: dbPayload.degree,
     github_url: dbPayload.github,
     gender: dbPayload.gender,
+    phone: dbPayload.phone,
     declared_skills: payload.skills || [],
     skill_vector: payload.raw_text ? { status: "processing" } : (payload.skill_vector || {}),
     status: 'approved'
   }
 
-  const { error: partError } = await supabase.from('participants').insert(participantPayload)
-  if (partError && partError.code !== '23505') {
-    console.error("Direct participant failed:", partError);
-    return { success: false, error: partError.message }
+  const { data: existingPart } = await supabase.from('participants').select('id').eq('user_id', user.id).single()
+
+  if (existingPart) {
+    const { error: partUpdateError } = await supabase.from('participants').update({
+      name: participantPayload.name,
+      email: participantPayload.email,
+      college_name: participantPayload.college_name,
+      degree: participantPayload.degree,
+      github_url: participantPayload.github_url,
+      gender: participantPayload.gender,
+      phone: participantPayload.phone,
+      declared_skills: participantPayload.declared_skills,
+      skill_vector: participantPayload.skill_vector,
+      status: participantPayload.status
+    }).eq('user_id', user.id)
+    if (partUpdateError) {
+      console.error("Direct participant update failed:", partUpdateError);
+      return { success: false, error: partUpdateError.message }
+    }
+  } else {
+    const { error: partError } = await supabase.from('participants').insert(participantPayload)
+    if (partError && partError.code !== '23505') {
+      console.error("Direct participant failed:", partError);
+      return { success: false, error: partError.message }
+    }
   }
 
   // 3. Trigger Background AI Task

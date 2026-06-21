@@ -21,8 +21,10 @@ def _parse_prompt(resume_text: str) -> str:
 
 Return JSON with keys:
 - name (string or null)
+- phone (string or null)
+- gender (string or null — infer from the candidate's name if not explicitly stated, e.g. Male, Female, or return null if unsure)
 - college_name (string or null)
-- degree (string or null — if the resume mentions B.Tech, BTech, B.E., or similar, you MUST normalize and output exactly "Bachelor")
+- degree (string or null — extract the exact degree mentioned (e.g., B.Tech, BS, MS, PhD))
 - year_of_study (string or null — extract the year of study, e.g. "3rd Year", "Senior", "2024", etc.)
 - github_url (string or null — only if explicitly present, never invent)
 - linkedin_url (string or null — only if explicitly present, never invent)
@@ -37,7 +39,7 @@ Resume:
 """
 
 
-def _coerce_parsed(data: dict) -> ParsedResume:
+def _coerce_parsed(data: dict, resume_text: str) -> ParsedResume:
     raw_skills = data.get("raw_skills", [])
     if not isinstance(raw_skills, list):
         raw_skills = []
@@ -64,10 +66,38 @@ def _coerce_parsed(data: dict) -> ParsedResume:
             else:
                 linkedin_url = "https://" + linkedin_url
         
+    degree = str(data["degree"]) if data.get("degree") else None
+    deg_low = (degree or "").lower()
+    res_low = resume_text.lower()
+    if "b.tech" in deg_low or "btech" in deg_low:
+        degree = "B.Tech"
+    elif "b.e" in deg_low:
+        degree = "B.E."
+    elif "b.tech" in res_low or "btech" in res_low:
+        degree = "B.Tech"
+    elif "b.e." in res_low or "b e " in res_low:
+        degree = "B.E."
+    elif "bachelor" in deg_low or "bachelor" in res_low:
+        degree = "Bachelor"
+        
+    phone = str(data["phone"]) if data.get("phone") else None
+    if phone:
+        phone = phone.strip()
+        if phone.startswith("+91"):
+            phone = phone.replace("+91", "").strip("- ")
+        elif phone.startswith("+1"):
+            phone = phone.replace("+1", "").strip("- ")
+        elif phone.startswith("91") and len(phone) > 10:
+            phone = phone[2:].strip("- ")
+            
+        phone = f"+91 {phone}"
+            
     return ParsedResume(
         name=str(data["name"]) if data.get("name") else None,
+        phone=phone,
+        gender=str(data["gender"]) if data.get("gender") else None,
         college_name=str(data["college_name"]) if data.get("college_name") else None,
-        degree=str(data["degree"]) if data.get("degree") else None,
+        degree=degree,
         year_of_study=str(data["year_of_study"]) if data.get("year_of_study") else None,
         github_url=github_url,
         linkedin_url=linkedin_url,
@@ -79,7 +109,7 @@ def _coerce_parsed(data: dict) -> ParsedResume:
 
 async def parse_resume_async(resume_text: str) -> ParsedResume:
     """Parse raw resume text into structured fields."""
-    return _coerce_parsed(await call_json_async(_parse_prompt(resume_text)))
+    return _coerce_parsed(await call_json_async(_parse_prompt(resume_text)), resume_text)
 
 
 async def parse_and_vectorize_batch(
@@ -96,7 +126,7 @@ async def parse_and_vectorize_batch(
     async def _one(text: str) -> tuple[ParsedResume, SkillVector, list[float], dict]:
         async with semaphore:
             parsed = await parse_resume_async(text)
-            vector, embedding, breakdown = await compute_skill_vector(text, parsed.projects)
+            vector, embedding, breakdown = await compute_skill_vector(text, parsed.projects, {})
             return parsed, vector, embedding, breakdown
 
     return await asyncio.gather(

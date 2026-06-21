@@ -5,6 +5,7 @@ export interface ParsedResumeData {
   name?: string | null;
   email?: string | null;
   phone?: string | null;
+  gender?: string | null;
   college_name?: string | null;
   degree?: string | null;
   github_url?: string | null;

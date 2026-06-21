@@ -44,7 +44,12 @@ export default function OrganizerDashboard() {
           <p className="text-on-surface-variant mt-1 text-sm">Welcome back. Here's what's happening across your {hackathons.length} hackathons.</p>
         </div>
         <div className="flex gap-3">
-         
+          <Link href="/organizer/dashboard/fairness">
+            <button className="border-2 border-primary/20 text-primary px-5 py-2 rounded-lg font-label-sm hover:bg-primary/5 transition-colors flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px]">gavel</span>
+              Fairness Engine
+            </button>
+          </Link>
           <Link href="/organizer/hackathons/create/step-1">
             <button className="bg-primary text-white px-5 py-2 rounded-lg font-label-sm hover:bg-primary/90 transition-colors flex items-center gap-2">
               <span className="material-symbols-outlined text-[16px]">add</span>

@@ -71,6 +71,8 @@ class SkillVector(BaseModel):
 
 class ParsedResume(BaseModel):
     name: Optional[str] = None
+    phone: Optional[str] = None
+    gender: Optional[str] = None
     college_name: Optional[str] = None
     degree: Optional[str] = None
     year_of_study: Optional[str] = None

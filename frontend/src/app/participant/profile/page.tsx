@@ -153,7 +153,7 @@ export default async function ParticipantProfile() {
               <div>
                 <h4 className="font-bold text-[18px] text-on-surface">{profile.college_name || "Not Specified"}</h4>
                 <p className="text-on-surface-variant text-[14px] font-medium mt-1">
-                  Participant • Current Student
+                  Participant • {profile.degree && profile.degree !== "N/A" ? profile.degree : "Current Student"}
                 </p>
               </div>
             </div>
