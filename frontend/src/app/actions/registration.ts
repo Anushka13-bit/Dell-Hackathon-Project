@@ -187,12 +187,30 @@ export async function createDirectProfile(payload: SubmitRegistrationPayload) {
       if (regError.code !== '23505') {
         console.error("Direct registration failed:", regError);
         return { success: false, error: regError.message }
+      } else {
+        // 23505: Unique constraint violation (either user_id or email)
+        const adminSupabase = await createAdminClient()
+        const { data: dupReg } = await adminSupabase.from('registrations')
+            .select('id')
+            .or(`user_id.eq.${user.id},email.eq.${dbPayload.email}`)
+            .limit(1)
+            .single()
+            
+        if (dupReg) {
+            registrationId = dupReg.id
+            const { id, ...updatePayload } = dbPayload
+            await adminSupabase.from('registrations').update(updatePayload).eq('id', registrationId)
+        } else {
+            console.error("Direct registration unique constraint violation but no existing record found.");
+            return { success: false, error: "Unique constraint violation" }
+        }
       }
     }
   }
 
   // 2. Insert Participant
   const participantPayload = {
+    id: user.id,
     user_id: user.id,
     registration_id: registrationId,
     name: dbPayload.name,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useHackathonStore, ReviewerInvite } from "@/store/useHackathonStore";
@@ -9,24 +9,47 @@ export default function CreateHackathonStep4() {
   const router = useRouter();
   const { draftId, reviewers, setReviewers } = useHackathonStore();
 
-  const [email, setEmail] = useState("");
-  const [expertise, setExpertise] = useState("AI & ML");
-  const [organization, setOrganization] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleInvite = () => {
-    if (!email) return;
-    
-    const newReviewer: ReviewerInvite = {
-      name: "", // Can be filled if we add a name field
-      email,
-      institution: organization,
-      expertise_domains: [expertise]
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+
+      const lines = text.split('\n').filter(line => line.trim() !== '');
+      const newReviewers: ReviewerInvite[] = [];
+      
+      const hasHeader = lines[0].toLowerCase().includes('email');
+      const startIdx = hasHeader ? 1 : 0;
+
+      for (let i = startIdx; i < lines.length; i++) {
+        // Handle simple CSV without escaped commas
+        const parts = lines[i].split(',').map(s => s.trim());
+        if (parts.length >= 2) {
+          const name = parts[0] || '';
+          const email = parts[1] || '';
+          const institution = parts.length > 2 ? parts[2] : '';
+          const expertiseStr = parts.length > 3 ? parts[3] : 'AI & ML';
+          
+          if (email) {
+            newReviewers.push({
+              name,
+              email,
+              institution,
+              expertise_domains: [expertiseStr]
+            });
+          }
+        }
+      }
+
+      setReviewers([...reviewers, ...newReviewers]);
     };
-    
-    setReviewers([...reviewers, newReviewer]);
-    setEmail("");
-    setExpertise("AI & ML");
-    setOrganization("");
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const removeReviewer = (index: number) => {
@@ -98,51 +121,31 @@ export default function CreateHackathonStep4() {
         {/* Left: Invitation Form */}
         <div className="col-span-12 lg:col-span-5 flex flex-col gap-gutter">
           <div className="bg-white rounded-3xl shadow-[0_20px_30px_-10px_rgba(214,203,191,0.2)] hover:shadow-[0_30px_40px_-15px_rgba(214,203,191,0.3)] transition-all duration-300 p-8 border border-outline-variant/30 h-full">
-            <header className="mb-8">
-              <h2 className="font-headline-md text-on-surface mb-2">Invite Experts</h2>
-              <p className="font-body-md text-on-surface-variant">Nominate professionals to judge projects and provide technical feedback to participants.</p>
-            </header>
-            
-            <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); handleInvite(); }}>
-              <div>
-                <label className="block font-label-md text-on-surface mb-2">Reviewer Email</label>
-                <input required value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-4 focus:ring-2 focus:ring-tertiary/20 focus:border-tertiary transition-all outline-none" placeholder="colleague@industry.com" type="email"/>
+            <header className="flex flex-col h-full justify-center text-center">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
+                <span className="material-symbols-outlined text-[32px] text-primary">upload_file</span>
               </div>
+              <h2 className="font-headline-md text-on-surface mb-3">Bulk Add Experts</h2>
+              <p className="font-body-md text-on-surface-variant mb-8">Upload a CSV file containing your reviewers. The file should have the following headers: <br/><br/><code>Name, Email, Organization, Expertise</code></p>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-label-md text-on-surface mb-2">Expertise</label>
-                  <select value={expertise} onChange={e => setExpertise(e.target.value)} className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-4 focus:ring-2 focus:ring-tertiary/20 focus:border-tertiary outline-none appearance-none cursor-pointer">
-                    <option>AI & ML</option>
-                    <option>Web3/Blockchain</option>
-                    <option>FinTech</option>
-                    <option>Product Design</option>
-                    <option>Sustainability</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block font-label-md text-on-surface mb-2">Organization</label>
-                  <input value={organization} onChange={e => setOrganization(e.target.value)} className="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-4 focus:ring-2 focus:ring-tertiary/20 focus:border-tertiary outline-none" placeholder="e.g. Anthropic" type="text"/>
-                </div>
-              </div>
-              
-              <button type="submit" className="w-full bg-primary text-white py-4 rounded-xl font-bold hover:bg-primary/90 transition-all shadow-md flex items-center justify-center gap-2">
-                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 0" }}>person_add</span>
-                Invite Reviewer
+              <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="mx-auto w-full max-w-xs bg-primary text-white py-4 rounded-xl font-bold hover:bg-primary/90 transition-all shadow-md flex items-center justify-center gap-2">
+                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 0" }}>cloud_upload</span>
+                Upload Reviewers CSV
               </button>
-            </form>
+            </header>
           </div>
         </div>
 
-        {/* Right: Pending Invitations List */}
+        {/* Right: Added Reviewers List */}
         <div className="col-span-12 lg:col-span-7">
           <div className="bg-white rounded-3xl shadow-[0_20px_30px_-10px_rgba(214,203,191,0.2)] hover:shadow-[0_30px_40px_-15px_rgba(214,203,191,0.3)] transition-all duration-300 p-8 border border-outline-variant/30 min-h-full">
             <div className="flex justify-between items-center mb-8">
               <div>
-                <h2 className="font-headline-md text-on-surface mb-1">Pending Invitations</h2>
-                <p className="font-label-md text-on-surface-variant">Reviewers who haven't accepted yet.</p>
+                <h2 className="font-headline-md text-on-surface mb-1">Added Reviewers</h2>
+                <p className="font-label-md text-on-surface-variant">Reviewers added to this hackathon.</p>
               </div>
-              <span className="px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full font-label-sm">{reviewers.length} Pending</span>
+              <span className="px-3 py-1 bg-secondary-container text-on-secondary-container rounded-full font-label-sm">{reviewers.length} Added</span>
             </div>
             
             <div className="space-y-4">

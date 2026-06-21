@@ -205,7 +205,8 @@ export default function RegistrationIntelligenceModule({
   const handleApprove = async () => {
     if (!selected) return;
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organizer/registrations/${selected.id}/approve`, { method: 'POST' });
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/organizer/registrations/${selected.id}/approve`, { method: 'POST' });
       if (!res.ok) throw new Error("Failed to approve");
       setRegistrations(prev => prev.map(r => r.id === selected.id ? { ...r, decision: 'AUTO_APPROVED' } : r));
     } catch (err) {
@@ -217,7 +218,8 @@ export default function RegistrationIntelligenceModule({
   const handleReject = async () => {
     if (!selected) return;
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/organizer/registrations/${selected.id}/reject`, { method: 'POST' });
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/organizer/registrations/${selected.id}/reject`, { method: 'POST' });
       if (!res.ok) throw new Error("Failed to reject");
       setRegistrations(prev => prev.map(r => r.id === selected.id ? { ...r, decision: 'REJECTED' } : r));
     } catch (err) {
@@ -286,8 +288,8 @@ export default function RegistrationIntelligenceModule({
         />
       </section>
 
-      <section className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-[1fr_380px]">
-        <div className="rounded-[24px] border border-outline-variant/30 bg-surface-container p-4">
+      <section className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-[1fr_380px] items-start">
+        <div className="rounded-[24px] border border-outline-variant/30 bg-surface-container p-4 h-fit">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
             <div className="relative flex-1">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline">
@@ -356,22 +358,22 @@ export default function RegistrationIntelligenceModule({
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="min-w-0 overflow-hidden rounded-[24px] border border-outline-variant/30 bg-white shadow-[0_20px_30px_-10px_rgba(214,203,191,0.35)]">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-left">
+            <table className="w-full min-w-[1100px] text-left">
               <thead>
                 <tr className="border-b border-outline-variant bg-surface-container-low">
-                  <th className="px-5 py-4 text-[12px] font-bold uppercase tracking-widest text-on-surface-variant">
+                  <th className="px-5 py-4 text-[12px] font-bold uppercase tracking-widest text-on-surface-variant w-[280px]">
                     Participant
                   </th>
                   <th className="px-5 py-4 text-[12px] font-bold uppercase tracking-widest text-on-surface-variant">
                     Hard invariants
                   </th>
-                  <th className="px-5 py-4 text-[12px] font-bold uppercase tracking-widest text-on-surface-variant">
+                  <th className="px-5 py-4 text-[12px] font-bold uppercase tracking-widest text-on-surface-variant w-[200px]">
                     Similarity
                   </th>
                   <th className="px-5 py-4 text-[12px] font-bold uppercase tracking-widest text-on-surface-variant">
                     FaceScan
                   </th>
-                  <th className="px-5 py-4 text-[12px] font-bold uppercase tracking-widest text-on-surface-variant">
+                  <th className="px-5 py-4 text-[12px] font-bold uppercase tracking-widest text-on-surface-variant w-[160px]">
                     Score
                   </th>
                   <th className="px-5 py-4 text-[12px] font-bold uppercase tracking-widest text-on-surface-variant">
@@ -422,7 +424,7 @@ export default function RegistrationIntelligenceModule({
                         </div>
                       </td>
                       <td className="px-5 py-4">
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex gap-1.5 flex-wrap">
                           <SignalPill active={registration.exactSignals.email} label="Email" />
                           <SignalPill active={registration.exactSignals.phone} label="Phone" />
                           <SignalPill active={registration.exactSignals.github} label="GitHub" />

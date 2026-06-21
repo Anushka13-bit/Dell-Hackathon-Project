@@ -19,19 +19,24 @@ interface Hackathon {
 
 export default function OrganizerDashboard() {
   const [hackathons, setHackathons] = useState<Hackathon[]>([]);
+  const [summary, setSummary] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   useEffect(() => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    fetch(`${apiUrl}/hackathons/`)
-      .then(res => res.json())
-      .then(data => {
-        setHackathons(data);
+    
+    Promise.all([
+      fetch(`${apiUrl}/hackathons/`).then(res => res.json()),
+      fetch(`${apiUrl}/organizer/summary`).then(res => res.json())
+    ])
+      .then(([hackathonsData, summaryData]) => {
+        setHackathons(hackathonsData);
+        setSummary(summaryData);
         setIsLoading(false);
       })
       .catch(err => {
-        console.error("Failed to load hackathons", err);
+        console.error("Failed to load dashboard data", err);
         setIsLoading(false);
       });
   }, []);
@@ -63,7 +68,7 @@ export default function OrganizerDashboard() {
       <nav className="fixed top-0 left-0 right-0 h-16 bg-white/60 backdrop-blur-md border-b border-outline-variant/20 flex items-center justify-between px-4 md:px-6 z-50">
         <div className="flex items-center">
           <div className="relative w-[192px] h-[192px] -my-16 -ml-8">
-            <Image src="/logo.png" alt="Dell Logo" fill className="object-contain object-left" />
+            <Image src="/logo.png" priority alt="Dell Logo" fill className="object-contain object-left" />
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -129,7 +134,7 @@ export default function OrganizerDashboard() {
         <div className="bg-white p-4 rounded-xl shadow-sm border border-outline-variant/20 hover:shadow-md transition-shadow">
           <p className="text-[9px] uppercase tracking-widest text-on-surface-variant/60 font-bold mb-1">Registrations</p>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold">4,852</span>
+            <span className="text-2xl font-bold">{summary?.total_registrations || 0}</span>
           </div>
           <p className="text-[10px] text-primary mt-1 font-medium">↑ 12% vs last month</p>
         </div>
@@ -137,15 +142,17 @@ export default function OrganizerDashboard() {
         <div className="bg-white p-4 rounded-xl shadow-sm border border-outline-variant/20 hover:shadow-md transition-shadow">
           <p className="text-[9px] uppercase tracking-widest text-on-surface-variant/60 font-bold mb-1">Submissions</p>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold">1,240</span>
+            <span className="text-2xl font-bold">{summary?.total_submissions || 0}</span>
           </div>
-          <p className="text-[9px] text-on-surface-variant/40 mt-1">75% completion rate</p>
+          <p className="text-[9px] text-on-surface-variant/40 mt-1">
+            {summary?.total_teams ? Math.round((summary.total_submissions / summary.total_teams) * 100) : 0}% completion rate
+          </p>
         </div>
         
         <div className="bg-white p-4 rounded-xl shadow-sm border border-outline-variant/20 hover:shadow-md transition-shadow">
           <p className="text-[9px] uppercase tracking-widest text-on-surface-variant/60 font-bold mb-1">Reviewers</p>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold">45</span>
+            <span className="text-2xl font-bold">{summary?.total_reviewers || 0}</span>
           </div>
           <p className="text-[9px] text-on-surface-variant/40 mt-1">Verified experts</p>
         </div>
@@ -176,7 +183,7 @@ export default function OrganizerDashboard() {
                 </div>
               )}
               
-              {hackathons.slice(0, 2).map((h) => (
+              {hackathons.slice().reverse().slice(0, 2).map((h) => (
                 <Link key={h.id} href={`/organizer/hackathons/${h.public_slug || h.id}`} className="block group">
                   <div className="bg-white rounded-xl border border-outline-variant/30 p-4 shadow-sm hover:shadow-md hover:border-primary/50 transition-all cursor-pointer h-full flex flex-col">
                     <div className="flex justify-between items-start mb-3">
@@ -230,32 +237,34 @@ export default function OrganizerDashboard() {
       <p className="text-xs uppercase tracking-widest text-on-surface-variant">
         Total Reach
       </p>
-      <h3 className="text-3xl font-bold mt-2">52K</h3>
-      <p className="text-sm text-primary mt-1">+18% this month</p>
+      <h3 className="text-3xl font-bold mt-2">{summary?.total_participants || 0}</h3>
+      <p className="text-sm text-primary mt-1">Participants</p>
     </div>
 
     <div className="bg-white p-5 rounded-xl border border-outline-variant/20 shadow-sm w-full">
       <p className="text-xs uppercase tracking-widest text-on-surface-variant">
         Registrations
       </p>
-      <h3 className="text-3xl font-bold mt-2">4,852</h3>
-      <p className="text-sm text-primary mt-1">+12%</p>
+      <h3 className="text-3xl font-bold mt-2">{summary?.total_registrations || 0}</h3>
+      <p className="text-sm text-primary mt-1">Registered users</p>
     </div>
 
     <div className="bg-white p-5 rounded-xl border border-outline-variant/20 shadow-sm w-full">
       <p className="text-xs uppercase tracking-widest text-on-surface-variant">
         Teams Formed
       </p>
-      <h3 className="text-3xl font-bold mt-2">720</h3>
-      <p className="text-sm text-primary mt-1">88% conversion</p>
+      <h3 className="text-3xl font-bold mt-2">{summary?.total_teams || 0}</h3>
+      <p className="text-sm text-primary mt-1">Active teams</p>
     </div>
 
     <div className="bg-white p-5 rounded-xl border border-outline-variant/20 shadow-sm w-full">
       <p className="text-xs uppercase tracking-widest text-on-surface-variant">
         Submission Rate
       </p>
-      <h3 className="text-3xl font-bold mt-2">72%</h3>
-      <p className="text-sm text-primary mt-1">580 submissions</p>
+      <h3 className="text-3xl font-bold mt-2">
+        {summary?.total_teams ? Math.round((summary.total_submissions / summary.total_teams) * 100) : 0}%
+      </h3>
+      <p className="text-sm text-primary mt-1">{summary?.total_submissions || 0} submissions</p>
     </div>
   </div>
   

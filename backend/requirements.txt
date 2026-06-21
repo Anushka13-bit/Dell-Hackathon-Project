@@ -26,3 +26,4 @@ networkx>=3.0,<3.5
 
 rapidfuzz>=3.14.0
 groq>=0.31.0
+pypdf>=4.0.0

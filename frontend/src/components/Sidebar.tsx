@@ -6,7 +6,7 @@ export default function Sidebar() {
   return (
     <aside className="h-screen w-64 fixed left-0 top-0 bg-[#04201d] rounded-r-[32px] flex flex-col py-stack-md px-4 shadow-lg z-30">
       <div className="mb-stack-lg px-2 flex flex-col items-start gap-1">
-        <Image src="/logo.png" alt="HackOS" width={840} height={240} className="h-[240px] w-auto object-contain brightness-0 invert" />
+        <Image src="/logo.png" priority alt="HackOS" width={840} height={240} className="h-[240px] object-contain brightness-0 invert" style={{ width: 'auto' }} />
         <p className="font-label-sm text-[12px] text-white/70 ml-1 opacity-80">Organizer Portal</p>
       </div>
       <nav className="flex-1 space-y-2">

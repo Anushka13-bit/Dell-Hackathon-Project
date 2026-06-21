@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 
 export default function HackathonLayout({
   children,
@@ -15,6 +15,25 @@ export default function HackathonLayout({
   const resolvedParams = use(params);
   const id = resolvedParams.id || "winter-2024";
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [hackathonName, setHackathonName] = useState("Loading...");
+
+  useEffect(() => {
+    const fetchHackathon = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const res = await fetch(`${apiUrl}/hackathons/${id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setHackathonName(data.name);
+        } else {
+          setHackathonName("Winter 2024 Tech Bloom"); // Fallback
+        }
+      } catch (err) {
+        setHackathonName("Winter 2024 Tech Bloom");
+      }
+    };
+    fetchHackathon();
+  }, [id]);
 
   const navLinks = [
     { name: "Overview", href: `/organizer/hackathons/${id}`, icon: "dashboard" },
@@ -38,7 +57,7 @@ export default function HackathonLayout({
             <span className="text-[14px] font-medium">Back to Events</span>
           </Link>
           <div className="h-4 w-px bg-outline-variant/50"></div>
-          <h1 className="font-headline-sm text-[24px] text-primary font-bold">Winter 2024 Tech Bloom</h1>
+          <h1 className="font-headline-sm text-[24px] text-primary font-bold">{hackathonName}</h1>
           <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded uppercase tracking-wider">Live</span>
           
           <div className="ml-auto flex items-center gap-4">

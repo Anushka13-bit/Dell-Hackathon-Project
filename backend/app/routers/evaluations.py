@@ -38,12 +38,13 @@ async def submit_evaluation(request: EvaluationSubmitRequest, db: Session = Depe
     eval_id = str(uuid.uuid4())
     
     query = """
-    INSERT INTO evaluations (evaluation_id, assignment_id, reviewer_id, idea_id, score, feedback, created_at)
-    VALUES (%s, %s, %s, %s, %s, %s, NOW())
+    INSERT INTO evaluations (evaluation_id, hackathon_id, assignment_id, reviewer_id, idea_id, score, feedback, created_at)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
     """
     try:
         execute(query, (
             eval_id,
+            request.hackathon_id,
             request.assignment_id,
             request.reviewer_id,
             request.idea_id,
@@ -146,9 +147,12 @@ async def create_evaluation(data: EvaluationCreate, db: Session = Depends(get_db
 
 
 @router.get("/", response_model=List[EvaluationOut])
-async def list_evaluations(db: Session = Depends(get_db)):
+async def list_evaluations(hackathon_id: Optional[str] = None, db: Session = Depends(get_db)):
     """List all evaluations."""
-    return db.query(Evaluation).all()
+    query = db.query(Evaluation)
+    if hackathon_id:
+        query = query.filter(Evaluation.hackathon_id == hackathon_id)
+    return query.all()
 
 
 @router.get("/idea/{idea_id}", response_model=List[EvaluationOut])

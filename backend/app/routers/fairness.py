@@ -49,6 +49,31 @@ def get_alerts(
     )
 
 
+@router.put("/alerts/{alert_id}/status")
+def update_alert_status(
+    alert_id: str,
+    status: str,
+    db: Session = Depends(get_db)
+):
+    alert = db.query(BiasAlert).filter(BiasAlert.alert_id == alert_id).first()
+    if alert:
+        alert.status = status
+        db.commit()
+    return {"detail": "updated"}
+
+
+@router.delete("/alerts/{alert_id}")
+def delete_alert(
+    alert_id: str,
+    db: Session = Depends(get_db)
+):
+    alert = db.query(BiasAlert).filter(BiasAlert.alert_id == alert_id).first()
+    if alert:
+        db.delete(alert)
+        db.commit()
+    return {"detail": "deleted"}
+
+
 @router.get("/report/latest")
 def get_latest_report(
     db: Session = Depends(get_db)

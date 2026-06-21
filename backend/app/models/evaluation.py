@@ -8,6 +8,7 @@ class Evaluation(Base):
     __tablename__ = "evaluations"
 
     evaluation_id = Column(UUID(as_uuid=True), primary_key=True)
+    hackathon_id = Column(UUID(as_uuid=True), nullable=True)
     assignment_id = Column(UUID(as_uuid=True), nullable=True)
     reviewer_id = Column(UUID(as_uuid=True), nullable=True)
     idea_id = Column(UUID(as_uuid=True), nullable=True)

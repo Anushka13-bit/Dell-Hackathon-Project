@@ -28,6 +28,8 @@ type SubmissionStatus = "pending" | "reviewed";
 
 interface Submission {
   id: string;
+  assignment_id: string;
+  idea_id: string;
   teamName: string;
   members: string[];
   problemStatement: string;
@@ -49,13 +51,8 @@ interface Rubric {
 }
 
 // ─────────────────────────────────────────────
-// ASSIGNED HACKATHON CONTEXT — replace with real fetch from actions.ts
-// (e.g. getAssignedHackathon(reviewerId) — assumes one active assignment)
+// ASSIGNED HACKATHON CONTEXT — dynamically fetched
 // ─────────────────────────────────────────────
-const ASSIGNED_HACKATHON = {
-  name: "EcoStream Hackathon 2026",
-  date: "Dec 14–16, 2026",
-};
 
 // ─────────────────────────────────────────────
 // SCORING RUBRICS — replace with real fetch if rubrics are configurable per hackathon
@@ -100,41 +97,64 @@ export default function ReviewerDashboard() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
-const loadAssignments = async () => {
-  try {
-    const reviewerId =
-  localStorage.getItem("reviewerId");
+  const [submissionDetail, setSubmissionDetail] = useState<any>(null);
+  const [ASSIGNED_HACKATHON, setAssignedHackathon] = useState({
+    id: "",
+    name: "Loading...",
+    date: "",
+  });
 
-  if (!reviewerId) {
-    router.push("/auth/reviewer-login");
-    return;
-}
+  const loadAssignments = async () => {
+    try {
+      const reviewerId = localStorage.getItem("reviewerId");
 
-    const teams = await fetch(
-      `http://127.0.0.1:8000/assignments/reviewer-dashboard/${reviewerId}`
-    ).then((r) => r.json());
+      if (!reviewerId) {
+        router.push("/auth/reviewer-login");
+        return;
+      }
 
-    setSubmissions(
-      teams.map((team: any) => ({
-        id: team.idea_id,
-        teamName: team.team_name,
-        members: team.members,
-        problemStatement: "",
-        ideaSubmission: "",
-        githubRepo: "",
-        demoVideoUrl: "",
-        presentationDeckName: "",
-        presentationDeckUrl: "",
-        status:
-          team.status.toLowerCase() === "reviewed"
-            ? "reviewed"
-            : "pending",
-      }))
-    );
-  } catch (err) {
-    console.error(err);
-  }
-};
+      // 1. Fetch hackathons
+      const hackathonsRes = await fetch("http://127.0.0.1:8000/hackathons/");
+      const hackathons = await hackathonsRes.json();
+      const currentHackathon = hackathons.length > 0 ? hackathons[0] : null;
+
+      if (currentHackathon) {
+        setAssignedHackathon({
+          id: currentHackathon.id,
+          name: currentHackathon.name,
+          date: `${currentHackathon.event_start || ""} - ${currentHackathon.event_end || ""}`
+        });
+      }
+
+      const hackathonQuery = currentHackathon ? `?hackathon_id=${currentHackathon.id}` : "";
+
+      const teams = await fetch(
+        `http://127.0.0.1:8000/assignments/reviewer-dashboard/${reviewerId}${hackathonQuery}`
+      ).then((r) => r.json());
+
+      setSubmissions(
+        teams.map((team: any) => ({
+          id: team.idea_id,
+          assignment_id: team.assignment_id,
+          idea_id: team.idea_id,
+          teamName: team.team_name,
+          members: team.members,
+          problemStatement: "",
+          ideaSubmission: "",
+          githubRepo: "",
+          demoVideoUrl: "",
+          presentationDeckName: "",
+          presentationDeckUrl: "",
+          status:
+            team.status.toLowerCase() === "reviewed"
+              ? "reviewed"
+              : "pending",
+        }))
+      );
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
 useEffect(() => {
   const reviewerId =
@@ -149,7 +169,6 @@ useEffect(() => {
 
   const [view, setView] = useState<View>("submissions");
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
-  const [submissionDetail, setSubmissionDetail] = useState<any>(null);
 
   // rubricId -> score
   const [rubricScores, setRubricScores] = useState<Record<string, number>>({});
@@ -197,8 +216,17 @@ useEffect(() => {
 
 const submitReview = async () => {
   try {
-    const reviewerId =
-      localStorage.getItem("reviewerId");
+    const reviewerId = localStorage.getItem("reviewerId");
+    if (!reviewerId || !ASSIGNED_HACKATHON.id || !selectedSubmission) return;
+
+    const payload = {
+      hackathon_id: ASSIGNED_HACKATHON.id,
+      assignment_id: selectedSubmission.assignment_id,
+      reviewer_id: reviewerId,
+      idea_id: selectedSubmission.idea_id,
+      score: totalScore,
+      feedback: commentInput
+    };
 
     const response = await fetch(
       "http://localhost:8000/evaluations/evaluate",
@@ -207,12 +235,7 @@ const submitReview = async () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          reviewer_id: reviewerId,
-          idea_id: selectedSubmissionId,
-          score: totalScore,
-          feedback: commentInput,
-        }),
+        body: JSON.stringify(payload),
       }
     );
 
@@ -247,7 +270,7 @@ const submitReview = async () => {
         <div className="flex items-center justify-between px-4 md:px-8 h-20 w-full max-w-[1280px] mx-auto">
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center mt-1">
-                <Image src="/logo.png" alt="HackOS" width={840} height={240} className="h-60 w-auto object-contain" />
+                <Image src="/logo.png" priority alt="HackOS" width={840} height={240} className="h-60 object-contain" style={{ width: 'auto' }} />
             </Link>
 
           </div>

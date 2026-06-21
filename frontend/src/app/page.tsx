@@ -58,7 +58,7 @@ export default function LandingPage() {
       <header className="bg-surface/80 dark:bg-surface/80 backdrop-blur-md border-b border-outline-variant/30 dark:border-outline/20 docked full-width top-0 sticky z-50">
         <nav className="flex justify-between items-center px-5 md:px-margin-desktop h-20 w-full max-w-[1280px] mx-auto">
           <Link href="/" className="flex items-center mt-1">
-            <Image src="/logo.png" alt="HackOS" width={840} height={240} className="h-60 w-auto object-contain" />
+            <Image src="/logo.png" priority={true} alt="HackOS" width={840} height={240} className="h-60 object-contain" style={{ width: 'auto' }} />
           </Link>
           
           <div className="flex items-center gap-4 md:-mr-10 lg:-mr-16">
@@ -292,7 +292,7 @@ export default function LandingPage() {
       <footer className="bg-surface-container dark:bg-surface-container-high border-t border-outline-variant/20">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 px-5 md:px-margin-desktop py-12 max-w-[1280px] mx-auto">
           <div className="col-span-1 md:col-span-1">
-            <Image src="/logo.png" alt="HackOS" width={720} height={204} className="h-[204px] w-auto object-contain mb-4" />
+            <Image src="/logo.png" alt="HackOS" width={720} height={204} className="h-[204px] object-contain mb-4" style={{ width: 'auto' }} />
             <p className="text-on-surface-variant text-[16px] leading-relaxed opacity-80">
               End-to-End Hackathon Management Platform
             </p>

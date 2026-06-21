@@ -31,7 +31,13 @@ export default function Step1Resume() {
         });
         
         if (!response.ok) {
-            throw new Error(`Upload failed: ${response.statusText}`);
+            let errorMsg = `Upload failed: ${response.statusText}`;
+            try {
+                const errData = await response.json();
+                if (errData.detail) errorMsg = errData.detail;
+                else if (errData.error) errorMsg = errData.error;
+            } catch (e) {}
+            throw new Error(errorMsg);
         }
         
         setUploadText("Building profile...");

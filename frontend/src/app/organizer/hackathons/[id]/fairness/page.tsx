@@ -2,35 +2,55 @@
 
 import Link from "next/link";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 export default function FairnessDashboard() {
   const [alerts, setAlerts] = useState<any[]>([]);
   const [report, setReport] = useState<any>(null);
   const [reviewerStats, setReviewerStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRecalibrating, setIsRecalibrating] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState<any>(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const [resAlerts, resReport, resStats] = await Promise.all([
+        fetch(`${apiUrl}/fairness/alerts`),
+        fetch(`${apiUrl}/fairness/report/latest`),
+        fetch(`${apiUrl}/fairness/reviewer_stats`)
+      ]);
+
+      if (resAlerts.ok) setAlerts(await resAlerts.json());
+      if (resReport.ok) setReport(await resReport.json());
+      if (resStats.ok) setReviewerStats(await resStats.json());
+    } catch (e) {
+      console.error("Failed to fetch fairness data", e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-        const [resAlerts, resReport, resStats] = await Promise.all([
-          fetch(`${apiUrl}/fairness/alerts`),
-          fetch(`${apiUrl}/fairness/report/latest`),
-          fetch(`${apiUrl}/fairness/reviewer_stats`)
-        ]);
-
-        if (resAlerts.ok) setAlerts(await resAlerts.json());
-        if (resReport.ok) setReport(await resReport.json());
-        if (resStats.ok) setReviewerStats(await resStats.json());
-      } catch (e) {
-        console.error("Failed to fetch fairness data", e);
-      } finally {
-        setLoading(false);
-      }
-    }
     fetchData();
-  }, []);
+  }, [fetchData]);
+
+  const handleRecalibrate = async () => {
+    setIsRecalibrating(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      await fetch(`${apiUrl}/fairness/run/mock-round-1`, { method: "POST" });
+      
+      // Wait 3 seconds for celery task to complete, then refetch
+      setTimeout(async () => {
+        await fetchData();
+        setIsRecalibrating(false);
+      }, 3000);
+    } catch (e) {
+      console.error(e);
+      setIsRecalibrating(false);
+    }
+  };
   return (
     <div className="p-6 h-[calc(100vh-64px)] max-w-[1280px] mx-auto flex flex-col gap-6 overflow-y-auto">
       {/* Header */}
@@ -50,14 +70,11 @@ export default function FairnessDashboard() {
           </p>
         </div>
         <button 
-          onClick={async () => {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-            await fetch(`${apiUrl}/fairness/run/mock-round-1`, { method: "POST" });
-            alert("Recalibration task queued!");
-          }}
-          className="bg-primary-container text-on-primary-container px-6 py-2.5 rounded-xl font-label-md hover:bg-primary-container/80 transition-all flex items-center gap-2">
-          <span className="material-symbols-outlined text-[20px]">refresh</span>
-          Run Recalibration
+          onClick={handleRecalibrate}
+          disabled={isRecalibrating}
+          className="bg-primary-container text-on-primary-container px-6 py-2.5 rounded-xl font-label-md hover:bg-primary-container/80 transition-all flex items-center gap-2 disabled:opacity-50">
+          <span className={`material-symbols-outlined text-[20px] ${isRecalibrating ? 'animate-spin' : ''}`}>refresh</span>
+          {isRecalibrating ? 'Recalibrating...' : 'Run Recalibration'}
         </button>
       </div>
 
@@ -138,11 +155,18 @@ export default function FairnessDashboard() {
                 <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/50 flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-outline text-[18px]">engineering</span>
-                    <span className="font-label-md text-on-surface">Review recommended</span>
+                    <span className="font-label-md text-on-surface">
+                      {alert.status === 'under_review' ? 'Under Human Review' : 'Review recommended'}
+                    </span>
                   </div>
-                  <button className="bg-surface-container-high hover:bg-surface-container-highest px-4 py-2 rounded-lg font-label-md text-on-surface transition-colors">
-                    Take Action
-                  </button>
+                  {alert.status !== 'under_review' && (
+                    <button 
+                      onClick={() => setSelectedAlert(alert)}
+                      className="bg-surface-container-high hover:bg-surface-container-highest px-4 py-2 rounded-lg font-label-md text-on-surface transition-colors"
+                    >
+                      Take Action
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -212,6 +236,75 @@ export default function FairnessDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Take Action Modal */}
+      {selectedAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-surface-container-lowest p-8 rounded-3xl max-w-md w-full shadow-lg border border-outline-variant/30">
+            <div className="flex items-center gap-3 mb-4 text-primary">
+              <span className="material-symbols-outlined text-[32px]">gavel</span>
+              <h3 className="font-headline-sm text-[24px]">Resolve Bias Alert</h3>
+            </div>
+            <p className="text-on-surface-variant mb-6 leading-relaxed">
+              How would you like to handle the <strong>{selectedAlert.alert_type?.replace(/_/g, ' ')}</strong> alert?
+            </p>
+            <div className="flex flex-col gap-3 mb-8">
+              <button 
+                onClick={async () => {
+                  try {
+                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+                    const id = selectedAlert.alert_id || selectedAlert.id;
+                    await fetch(`${apiUrl}/fairness/alerts/${id}/status?status=under_review`, { method: 'PUT' });
+                    setAlerts(alerts.map(a => 
+                      (a.alert_id || a.id) === id 
+                        ? { ...a, status: 'under_review' } 
+                        : a
+                    ));
+                  } catch (e) {
+                    console.error("Failed to update alert", e);
+                  }
+                  setSelectedAlert(null);
+                }}
+                className="w-full px-6 py-4 bg-primary-container text-on-primary-container rounded-xl font-bold hover:bg-primary-container/80 transition-colors flex items-center gap-3 text-left"
+              >
+                <span className="material-symbols-outlined">person_search</span>
+                <div>
+                  <div className="text-[14px]">Flag for Human Review</div>
+                  <div className="text-[11px] font-normal opacity-80 mt-0.5">Escalate to the ethics committee for manual inspection</div>
+                </div>
+              </button>
+              <button 
+                onClick={async () => {
+                  try {
+                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+                    const id = selectedAlert.alert_id || selectedAlert.id;
+                    await fetch(`${apiUrl}/fairness/alerts/${id}`, { method: 'DELETE' });
+                    setAlerts(alerts.filter(a => (a.alert_id || a.id) !== id));
+                  } catch (e) {
+                    console.error("Failed to delete alert", e);
+                  }
+                  setSelectedAlert(null);
+                }}
+                className="w-full px-6 py-4 border border-outline-variant/30 text-on-surface rounded-xl font-bold hover:bg-surface-container-high transition-colors flex items-center gap-3 text-left"
+              >
+                <span className="material-symbols-outlined text-outline">delete</span>
+                <div>
+                  <div className="text-[14px]">Dismiss Alert</div>
+                  <div className="text-[11px] font-normal text-outline mt-0.5">Remove this alert from the dashboard</div>
+                </div>
+              </button>
+            </div>
+            <div className="flex justify-end">
+              <button 
+                onClick={() => setSelectedAlert(null)}
+                className="px-6 py-2 rounded-xl font-label-md text-on-surface hover:bg-surface-container-high transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

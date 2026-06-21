@@ -169,12 +169,17 @@ async def analyze_resume(request: ResumeAnalysisRequest):
         breakdown=breakdown,
     )
 
+@router.get("/sysinfo")
+async def get_sysinfo():
+    import sys
+    return {"executable": sys.executable, "path": sys.path}
+
 @router.post("/upload_resume", response_model=ResumeAnalysisResponse)
 async def upload_resume(file: UploadFile = File(...)):
     """Parses an uploaded PDF resume and returns the AI analysis inline."""
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
-
+        
     try:
         import pypdf
         import io
@@ -184,7 +189,10 @@ async def upload_resume(file: UploadFile = File(...)):
         for page in pdf_reader.pages:
             text += page.extract_text() + "\n"
     except Exception as e:
-        raise HTTPException(status_code=400, detail="Corrupted PDF")
+        import traceback
+        traceback.print_exc()
+        print(f"Failed to parse PDF: {repr(e)}")
+        raise HTTPException(status_code=400, detail=f"Corrupted PDF or Parse Error: {repr(e)}")
         
     if not text.strip():
         raise HTTPException(status_code=400, detail="No text extracted")

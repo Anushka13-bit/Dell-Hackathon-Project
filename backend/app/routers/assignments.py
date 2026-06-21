@@ -114,9 +114,12 @@ def generate_assignments():
 
 
 @router.get("/", response_model=List[AssignmentOut])
-async def list_assignments(db: Session = Depends(get_db)):
+async def list_assignments(hackathon_id: Optional[str] = None, db: Session = Depends(get_db)):
     """List all assignments."""
-    return db.query(Assignment).all()
+    query = db.query(Assignment)
+    if hackathon_id:
+        query = query.filter(Assignment.hackathon_id == hackathon_id)
+    return query.all()
 
 
 @router.get("/reviewer/{reviewer_id}", response_model=List[AssignmentOut])
@@ -130,6 +133,7 @@ async def get_assignments_for_reviewer(reviewer_id: str, db: Session = Depends(g
 )
 async def reviewer_dashboard(
     reviewer_id: str,
+    hackathon_id: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     import time
@@ -139,11 +143,11 @@ async def reviewer_dashboard(
     # -------------------------
     # Fetch assignments
     # -------------------------
-    assignments = (
-        db.query(Assignment)
-        .filter(Assignment.reviewer_id == reviewer_id)
-        .all()
-    )
+    query = db.query(Assignment).filter(Assignment.reviewer_id == reviewer_id)
+    if hackathon_id:
+        query = query.filter(Assignment.hackathon_id == hackathon_id)
+        
+    assignments = query.all()
 
     if not assignments:
         return []

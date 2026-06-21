@@ -76,3 +76,10 @@ async def create_hackathon(
 @router.get("/", response_model=List[HackathonOut])
 async def list_hackathons(db: Session = Depends(get_db)):
     return db.query(Hackathon).all()
+
+@router.get("/{hackathon_id}", response_model=HackathonOut)
+async def get_hackathon(hackathon_id: UUID, db: Session = Depends(get_db)):
+    hackathon = db.query(Hackathon).filter(Hackathon.id == hackathon_id).first()
+    if not hackathon:
+        raise HTTPException(status_code=404, detail="Hackathon not found")
+    return hackathon

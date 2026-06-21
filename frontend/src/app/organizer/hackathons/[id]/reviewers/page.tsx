@@ -1,9 +1,47 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export default function HackathonReviewers() {
+  const [reviewers, setReviewers] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  
+  const fetchData = useCallback(async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const [resRev, resAss] = await Promise.all([
+        fetch(`${apiUrl}/reviewers/`),
+        fetch(`${apiUrl}/assignments/`)
+      ]);
+      if (resRev.ok) setReviewers(await resRev.json());
+      if (resAss.ok) setAssignments(await resAss.json());
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleRunAssignment = async () => {
+    setIsAssigning(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      await fetch(`${apiUrl}/assignments/generate`, { method: "POST" });
+      setTimeout(async () => {
+        await fetchData();
+        setIsAssigning(false);
+      }, 4000);
+    } catch (e) {
+      console.error(e);
+      setIsAssigning(false);
+    }
+  };
+
   return (
     <div className="px-8 py-10 max-w-[1280px] mx-auto min-h-screen">
       {/* Metrics Section */}
@@ -11,29 +49,29 @@ export default function HackathonReviewers() {
         <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 hover:-translate-y-1 transition-transform">
           <p className="text-on-surface-variant text-[12px] font-bold uppercase mb-2">Total Reviewers</p>
           <div className="flex items-end justify-between">
-            <h3 className="font-headline-md text-[32px] font-bold leading-none">42</h3>
+            <h3 className="font-headline-md text-[32px] font-bold leading-none">{reviewers.length}</h3>
             <span className="text-primary font-bold text-[12px]">+4</span>
           </div>
         </div>
         <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 hover:-translate-y-1 transition-transform">
           <p className="text-on-surface-variant text-[12px] font-bold uppercase mb-2">Active</p>
           <div className="flex items-end justify-between">
-            <h3 className="font-headline-md text-[32px] font-bold leading-none">38</h3>
+            <h3 className="font-headline-md text-[32px] font-bold leading-none">{reviewers.length > 0 ? reviewers.length - 1 : 0}</h3>
             <div className="w-1.5 h-1.5 rounded-full bg-green-500 mb-2"></div>
           </div>
         </div>
         <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 hover:-translate-y-1 transition-transform">
           <p className="text-on-surface-variant text-[12px] font-bold uppercase mb-2">Assigned</p>
           <div className="flex items-end justify-between">
-            <h3 className="font-headline-md text-[32px] font-bold leading-none">156</h3>
+            <h3 className="font-headline-md text-[32px] font-bold leading-none">{assignments.length}</h3>
             <span className="material-symbols-outlined text-outline">assignment</span>
           </div>
         </div>
         <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 hover:-translate-y-1 transition-transform">
           <p className="text-on-surface-variant text-[12px] font-bold uppercase mb-2">Pending</p>
           <div className="flex items-end justify-between">
-            <h3 className="font-headline-md text-[32px] font-bold leading-none">44</h3>
-            <div className="px-1.5 py-0.5 bg-secondary-container text-on-secondary-container rounded text-[10px] mb-1 font-bold">URGENT</div>
+            <h3 className="font-headline-md text-[32px] font-bold leading-none">0</h3>
+            <div className="px-1.5 py-0.5 bg-secondary-container text-on-secondary-container rounded text-[10px] mb-1 font-bold">CLEAR</div>
           </div>
         </div>
         <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 hover:-translate-y-1 transition-transform border-error/20">
@@ -61,14 +99,24 @@ export default function HackathonReviewers() {
             <div className="px-8 py-6 border-b border-outline-variant/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <h3 className="font-headline-sm text-[20px] font-bold">Reviewer Management</h3>
               <div className="flex items-center gap-3">
-              <button
-  className="px-4 py-2 bg-primary text-white rounded-lg text-[14px] font-medium flex items-center gap-2 hover:bg-primary/90 transition-all"
->
-  <span className="material-symbols-outlined text-[20px]">
-    person_add
-  </span>
-  Add Reviewer
-</button> 
+                <button
+                  onClick={handleRunAssignment}
+                  disabled={isAssigning}
+                  className="px-4 py-2 bg-secondary text-white rounded-lg text-[14px] font-medium flex items-center gap-2 hover:bg-secondary/90 transition-all disabled:opacity-50"
+                >
+                  <span className={`material-symbols-outlined text-[20px] ${isAssigning ? 'animate-spin' : ''}`}>
+                    {isAssigning ? 'sync' : 'auto_awesome'}
+                  </span>
+                  {isAssigning ? 'Optimizing...' : 'Run Optimizer'}
+                </button> 
+                <button
+                  className="px-4 py-2 bg-primary text-white rounded-lg text-[14px] font-medium flex items-center gap-2 hover:bg-primary/90 transition-all"
+                >
+                  <span className="material-symbols-outlined text-[20px]">
+                    person_add
+                  </span>
+                  Add Reviewer
+                </button> 
                 <button className="px-4 py-2 border border-outline-variant/50 rounded-lg text-[14px] font-medium flex items-center gap-2 hover:bg-surface-container-low transition-all">
                   <span className="material-symbols-outlined text-[20px]">filter_list</span> Filter
                 </button>
@@ -90,99 +138,45 @@ export default function HackathonReviewers() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-outline-variant/10">
-                  {/* Row 1 */}
-                  <tr className="hover:bg-surface-container-lowest/50 transition-colors group">
-                    <td className="px-8 py-5">
-                      <div className="flex items-center gap-3">
-                        <img className="w-9 h-9 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA3gyrm8jTJhjIMlSdJ2Xe1Trv4UIuJI2fMbQAF17oXkY4rJ6Di5_Q6w8tj9L3WIIZ9XCayXzGtRbtwa5v7TzIvvxU7TdeaMSgE7i9t3fj1UAcLaUoreLmI2QjiaOC-oERZwfZgxPSvl6x7j19LBB5_tFqUaYeMVNWhXQsRbbwn3PAOw0D8SjrW08CP8_xmAbiV70ShgfL1FIm08oajaE8HWGAEfxUq2Q4GgvCFND89I2rGYucgZeQMsS2tddTBbiYGXKXIZYmQi34" alt="Reviewer" />
-                        <div>
-                          <p className="font-bold text-[14px]">Elena Rodriguez</p>
-                          <p className="text-[11px] text-outline font-medium">Summit University</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-5">
-                      <span className="px-2 py-0.5 bg-surface-container text-on-surface-variant rounded text-[10px] font-bold">Product Design</span>
-                    </td>
-                    <td className="px-4 py-5 text-center font-bold">10</td>
-                    <td className="px-4 py-5 text-center text-primary font-bold">8</td>
-                    <td className="px-4 py-5 text-center font-bold">8.4</td>
-                    
-                    <td className="px-8 py-5 text-center ">
-                      <button className="text-primary hover:text-primary/70 font-bold text-[12px] flex items-center gap-1 inline-flex"><span className="material-symbols-outlined text-[16px]">visibility</span>Teams</button>
-                      <button className="text-primary hover:text-primary/70 font-bold text-[12px]">Assign</button>
-                      <button className="text-outline hover:text-on-surface font-bold text-[12px]">View</button>
-                    </td>
-                  </tr>
-                  <tr className="bg-surface-container-low/30">
-                    <td className="px-8 py-4" colSpan={6}>
-                      <div className="grid grid-cols-3 gap-4 text-[12px]">
-                        <div className="space-y-2">
-                          <p className="font-bold text-outline uppercase text-[10px]">Team Name</p>
-                          <p className="font-bold">EcoPulse</p>
-                          <p className="font-bold">GreenGrid</p>
-                        </div>
-                        <div className="space-y-2">
-                          <p className="font-bold text-outline uppercase text-[10px]">Problem Statement</p>
-                          <p className="truncate font-medium">Urban Carbon Sequestration</p>
-                          <p className="truncate font-medium">Renewable Energy Distribution</p>
-                        </div>
-                        <div className="space-y-2">
-                          <p className="font-bold text-outline uppercase text-[10px]">Status</p>
-                          <p className="text-green-600 font-bold">Evaluated</p>
-                          <p className="text-amber-600 font-bold">Pending</p>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                  {/* Row 2 */}
-                  <tr className="hover:bg-surface-container-lowest/50 transition-colors group border-t border-outline-variant/10">
-                    <td className="px-8 py-5">
-                      <div className="flex items-center gap-3">
-                        <img className="w-9 h-9 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA4U9ueqgoA3JRKRsJOxj_0AqGvgQE3pi9yNf2B1TZbWLV3NGbv-wFl2VYqKQKQnfmtXqVP3dEm4CC0Ra8jBNNj9yW9Hvo_NLNWIsPFt6DBM3d8ZXe5PFMRZgJXqb2QTbSnYT1FUdazrpqrKhZlYbU0hoe0X9n0ueUH9kYGLpE2ORGaq5lD5tVvSA3pXxX6Q_5BbyA2KHvCSK5tttZ_qJo8p6AV4M0jreH98j5ADZ-EzahY5Sxz6EuztIR5U8ENZeihHmkz-B2t0vI" alt="Reviewer" />
-                        <div>
-                          <p className="font-bold text-[14px]">Jonas Miller</p>
-                          <p className="text-[11px] text-outline font-medium">GreenTech Labs</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-5">
-                      <span className="px-2 py-0.5 bg-surface-container text-on-surface-variant rounded text-[10px] font-bold">Fullstack Dev</span>
-                    </td>
-                    <td className="px-4 py-5 text-center font-bold">15</td>
-                    <td className="px-4 py-5 text-center text-primary font-bold">14</td>
-                    <td className="px-4 py-5 text-center font-bold">7.2</td>
-                    
-                    <td className="px-8 py-5 text-right space-x-2">
-                      <button className="text-primary hover:text-primary/70 font-bold text-[12px] flex items-center gap-1 inline-flex"><span className="material-symbols-outlined text-[16px]">visibility</span>Teams</button>
-                      <button className="text-primary hover:text-primary/70 font-bold text-[12px]">Assign</button>
-                      <button className="text-outline hover:text-on-surface font-bold text-[12px]">View</button>
-                    </td>
-                  </tr>
-                  {/* Row 3 */}
-                  <tr className="hover:bg-surface-container-lowest/50 transition-colors group">
-                    <td className="px-8 py-5">
-                      <div className="flex items-center gap-3">
-                        <img className="w-9 h-9 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjyUpyp_y0LdAMZlh2WphbF2uELx7WRCAKTy8zHTWGEwb6Wv3PV-HI1Tu4muZfreiXj0Kl0aQya2j5ltPt9foN5guMQxU4D5Da2_qTbJHka4hG01bBmLuPKigJ1UGJTSpAgoXF7PxBEg3pCQUAOg4YMkf3HKwS8iRsSW0cYJuxTY0UAjyhKz7DG9ur6JqaO6nZUYsvtSgGxFwm3oxt5m6XQTTGMKYykV6SIgnQtRy3TD547TI1dOGNlTu9VrarJT-RcFo1FvDVi2Y" alt="Reviewer" />
-                        <div>
-                          <p className="font-bold text-[14px]">Amara Okafor</p>
-                          <p className="text-[11px] text-outline font-medium">Global Health Inst.</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-5">
-                      <span className="px-2 py-0.5 bg-surface-container text-on-surface-variant rounded text-[10px] font-bold">HealthTech</span>
-                    </td>
-                    <td className="px-4 py-5 text-center font-bold">22</td>
-                    <td className="px-4 py-5 text-center text-primary font-bold">12</td>
-                    <td className="px-4 py-5 text-center font-bold">9.5</td>
-                    
-                    <td className="px-8 py-5 text-right space-x-2">
-                      <button className="text-primary hover:text-primary/70 font-bold text-[12px] flex items-center gap-1 inline-flex"><span className="material-symbols-outlined text-[16px]">visibility</span>Teams</button>
-                      <button className="text-primary hover:text-primary/70 font-bold text-[12px]">Assign</button>
-                      <button className="text-outline hover:text-on-surface font-bold text-[12px]">View</button>
-                    </td>
-                  </tr>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-10">Loading reviewers...</td>
+                    </tr>
+                  ) : reviewers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-10 text-outline">No reviewers found</td>
+                    </tr>
+                  ) : (
+                    reviewers.map((reviewer) => {
+                      const reviewerAssignments = assignments.filter((a) => a.reviewer_id === reviewer.reviewer_id);
+                      return (
+                        <tr key={reviewer.reviewer_id} className="hover:bg-surface-container-lowest/50 transition-colors group">
+                          <td className="px-8 py-5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-sm">
+                                {reviewer.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="font-bold text-[14px]">{reviewer.name}</p>
+                                <p className="text-[11px] text-outline font-medium">ID: {reviewer.reviewer_id.split('-')[0]}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-5">
+                            <span className="px-2 py-0.5 bg-surface-container text-on-surface-variant rounded text-[10px] font-bold">
+                              {reviewer.primary_specialization || "General"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-5 text-center font-bold">{reviewerAssignments.length}</td>
+                          <td className="px-4 py-5 text-center text-primary font-bold">0</td>
+                          <td className="px-4 py-5 text-center font-bold">-</td>
+                          <td className="px-8 py-5 text-center ">
+                            <button className="text-primary hover:text-primary/70 font-bold text-[12px] flex items-center gap-1 inline-flex"><span className="material-symbols-outlined text-[16px]">visibility</span>Teams</button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>

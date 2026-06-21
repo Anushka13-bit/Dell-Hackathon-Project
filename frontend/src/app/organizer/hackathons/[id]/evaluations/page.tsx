@@ -1,6 +1,120 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
+
 export default function HackathonEvaluations() {
+  const [evaluations, setEvaluations] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [reviewers, setReviewers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isComputing, setIsComputing] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const pathParts = window.location.pathname.split('/');
+      const hackathonId = pathParts[3]; // organizer/hackathons/[id]/evaluations
+
+      const [evalRes, assignRes, subRes, teamRes, revRes] = await Promise.all([
+        fetch(`${apiUrl}/evaluations/?hackathon_id=${hackathonId}`),
+        fetch(`${apiUrl}/assignments/?hackathon_id=${hackathonId}`),
+        fetch(`${apiUrl}/submissions/`),
+        fetch(`${apiUrl}/teams/`),
+        fetch(`${apiUrl}/reviewers/`),
+      ]);
+      const [evalData, assignData, subData, teamData, revData] = await Promise.all([
+        evalRes.json(),
+        assignRes.json(),
+        subRes.json(),
+        teamRes.json(),
+        revRes.json(),
+      ]);
+      setEvaluations(evalData);
+      setAssignments(assignData);
+      setSubmissions(subData);
+      setTeams(teamData);
+      setReviewers(revData);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  if (loading) {
+    return (
+      <div className="p-8 max-w-[1280px] mx-auto min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <span className="material-symbols-outlined animate-spin text-[48px] text-primary">progress_activity</span>
+          <p className="text-outline font-medium">Loading Evaluation Intelligence...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const completed = evaluations.length;
+  const pending = Math.max(0, assignments.length - completed);
+  const avgScore = completed > 0 ? (evaluations.reduce((a, b) => a + (b.score || 0), 0) / completed).toFixed(1) : "0.0";
+  const highestScore = completed > 0 ? Math.max(...evaluations.map((e) => e.score || 0)).toFixed(1) : "0.0";
+
+  const ideaScores: Record<string, { sum: number, count: number, max: number }> = {};
+  evaluations.forEach((e) => {
+    if (!e.idea_id) return;
+    if (!ideaScores[e.idea_id]) ideaScores[e.idea_id] = { sum: 0, count: 0, max: 0 };
+    ideaScores[e.idea_id].sum += (e.score || 0);
+    ideaScores[e.idea_id].count += 1;
+    if ((e.score || 0) > ideaScores[e.idea_id].max) ideaScores[e.idea_id].max = (e.score || 0);
+  });
+
+  const rankings = Object.keys(ideaScores).map((idea_id) => {
+    const submission = submissions.find((s) => s.idea_id === idea_id);
+    const team = teams.find((t) => (t.team_id || t.id) === submission?.team_id);
+    const avg = ideaScores[idea_id].sum / ideaScores[idea_id].count;
+    return {
+      idea_id,
+      team_name: team?.name || submission?.title || "Unknown Team",
+      avg_score: avg,
+      max_score: ideaScores[idea_id].max
+    };
+  }).sort((a, b) => b.avg_score - a.avg_score);
+
+  const top3 = rankings.slice(0, 3);
+  const bestTeamName = top3[0]?.team_name || "N/A";
+
+  const handleExportCSV = () => {
+    const headers = ["Team Name", "Problem Statement", "Reviewer Name", "Status", "Final Score", "Feedback"];
+    const rows = assignments.map(assignment => {
+      const evaluation = evaluations.find(e => e.idea_id === assignment.idea_id && e.reviewer_id === assignment.reviewer_id);
+      const submission = submissions.find(s => (s.idea_id || s.id) === assignment.idea_id);
+      const team = teams.find(t => (t.team_id || t.id) === submission?.team_id);
+      const reviewer = reviewers.find(r => (r.reviewer_id || r.id) === assignment.reviewer_id);
+
+      return [
+        `"${team?.name || submission?.title || 'Unknown Team'}"`,
+        `"${submission?.description || ''}"`,
+        `"${reviewer?.name || 'Unknown Reviewer'}"`,
+        evaluation ? "Finalized" : "Pending",
+        evaluation?.score || "",
+        `"${evaluation?.feedback || ''}"`
+      ].join(",");
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `evaluations_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="p-8 max-w-[1280px] mx-auto min-h-screen flex flex-col lg:flex-row gap-6">
       {/* Center Column (Main Dashboard Content) */}
@@ -12,16 +126,22 @@ export default function HackathonEvaluations() {
             <p className="text-[18px] text-on-surface-variant mt-2 max-w-2xl font-medium">Track review progress, team scores, and judging insights across all submissions.</p>
           </div>
           <button 
+            disabled={isComputing}
             onClick={async () => {
+              setIsComputing(true);
               const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
               const pathParts = window.location.pathname.split('/');
               const hackathonId = pathParts[3] || "mock-hackathon";
               await fetch(`${apiUrl}/evaluations/compute-results/${hackathonId}`, { method: "POST" });
-              alert("Result computation task queued!");
+              setTimeout(() => {
+                fetchData();
+                setIsComputing(false);
+              }, 4000);
             }}
-            className="bg-primary text-white px-6 py-3 rounded-xl font-bold font-label-md hover:bg-primary/90 transition-colors shadow-md"
+            className="bg-primary text-white px-6 py-3 rounded-xl font-bold font-label-md hover:bg-primary/90 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            Compute Final Results
+            {isComputing && <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>}
+            {isComputing ? "Computing Results..." : "Compute Final Results"}
           </button>
         </div>
 
@@ -29,28 +149,27 @@ export default function HackathonEvaluations() {
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white/70 backdrop-blur-md p-4 rounded-2xl border border-outline-variant/30">
             <p className="text-[12px] font-bold text-outline uppercase">Completed</p>
-            <p className="font-headline-sm text-[24px] font-bold text-primary mt-1">84<span className="text-[14px] text-outline font-medium">/112</span></p>
+            <p className="font-headline-sm text-[24px] font-bold text-primary mt-1">{completed}<span className="text-[14px] text-outline font-medium">/{assignments.length || 0}</span></p>
             <div className="w-full bg-surface-variant h-1 rounded-full mt-3 overflow-hidden">
-              <div className="bg-primary h-full" style={{ width: "75%" }}></div>
+              <div className="bg-primary h-full" style={{ width: `${assignments.length > 0 ? (completed / assignments.length) * 100 : 0}%` }}></div>
             </div>
           </div>
           <div className="bg-white/70 backdrop-blur-md p-4 rounded-2xl border border-outline-variant/30">
             <p className="text-[12px] font-bold text-outline uppercase">Pending</p>
-            <p className="font-headline-sm text-[24px] font-bold text-secondary mt-1">28</p>
+            <p className="font-headline-sm text-[24px] font-bold text-secondary mt-1">{pending}</p>
             <p className="text-[10px] font-medium text-secondary/60 mt-1 flex items-center gap-1">
               <span className="material-symbols-outlined text-[12px]">schedule</span> Awaiting Review
             </p>
           </div>
           <div className="bg-white/70 backdrop-blur-md p-4 rounded-2xl border border-outline-variant/30">
             <p className="text-[12px] font-bold text-outline uppercase">Avg Score</p>
-            <p className="font-headline-sm text-[24px] font-bold text-primary mt-1">8.4</p>
+            <p className="font-headline-sm text-[24px] font-bold text-primary mt-1">{avgScore}</p>
             <p className="text-[10px] font-medium text-primary/60 mt-1">Benchmark: 7.2</p>
           </div>
           <div className="bg-white/70 backdrop-blur-md p-4 rounded-2xl border border-outline-variant/30">
             <p className="text-[12px] font-bold text-outline uppercase">Highest</p>
-            <p className="font-headline-sm text-[24px] font-bold text-primary mt-1">9.7</p>
-
-            <p className="text-[10px] font-medium text-tertiary mt-1">Team EcoStream</p>
+            <p className="font-headline-sm text-[24px] font-bold text-primary mt-1">{highestScore}</p>
+            <p className="text-[10px] font-medium text-tertiary mt-1 truncate">Team {bestTeamName}</p>
           </div>
         </div>
       {/* Ranking Panel */}
@@ -66,74 +185,29 @@ export default function HackathonEvaluations() {
   </div>
 
   <div className="space-y-6">
-    <div className="flex items-center gap-4 group cursor-pointer">
-      <span className="text-[32px] font-bold text-primary/20 group-hover:text-primary transition-colors leading-none">
-        01
-      </span>
-
-      <div className="flex-grow">
-        <p className="font-bold text-[14px] text-on-surface">
-          EcoStream
-        </p>
-
-        <div className="w-full bg-surface-variant h-1 rounded-full mt-1.5 overflow-hidden">
-          <div
-            className="bg-primary h-full"
-            style={{ width: "97%" }}
-          ></div>
+    {top3.length === 0 ? (
+      <div className="text-center py-4 text-outline font-medium">No evaluations yet</div>
+    ) : top3.map((rank, index) => (
+      <div key={rank.idea_id} className="flex items-center gap-4 group cursor-pointer">
+        <span className="text-[32px] font-bold text-primary/20 group-hover:text-primary transition-colors leading-none">
+          0{index + 1}
+        </span>
+        <div className="flex-grow">
+          <p className="font-bold text-[14px] text-on-surface truncate max-w-[200px]">
+            {rank.team_name}
+          </p>
+          <div className="w-full bg-surface-variant h-1 rounded-full mt-1.5 overflow-hidden">
+            <div
+              className="bg-primary h-full"
+              style={{ width: `${(rank.avg_score / 10) * 100}%` }}
+            ></div>
+          </div>
         </div>
+        <span className="font-headline-sm text-[20px] font-bold text-primary leading-none">
+          {rank.avg_score.toFixed(1)}
+        </span>
       </div>
-
-      <span className="font-headline-sm text-[20px] font-bold text-primary leading-none">
-        9.7
-      </span>
-    </div>
-
-    <div className="flex items-center gap-4 group cursor-pointer">
-      <span className="text-[32px] font-bold text-primary/20 group-hover:text-primary transition-colors leading-none">
-        02
-      </span>
-
-      <div className="flex-grow">
-        <p className="font-bold text-[14px] text-on-surface">
-          HydroPulse
-        </p>
-
-        <div className="w-full bg-surface-variant h-1 rounded-full mt-1.5 overflow-hidden">
-          <div
-            className="bg-primary h-full"
-            style={{ width: "96%" }}
-          ></div>
-        </div>
-      </div>
-
-      <span className="font-headline-sm text-[20px] font-bold text-primary leading-none">
-        9.6
-      </span>
-    </div>
-
-    <div className="flex items-center gap-4 group cursor-pointer">
-      <span className="text-[32px] font-bold text-primary/20 group-hover:text-primary transition-colors leading-none">
-        03
-      </span>
-
-      <div className="flex-grow">
-        <p className="font-bold text-[14px] text-on-surface">
-          TerraMind
-        </p>
-
-        <div className="w-full bg-surface-variant h-1 rounded-full mt-1.5 overflow-hidden">
-          <div
-            className="bg-primary h-full"
-            style={{ width: "89%" }}
-          ></div>
-        </div>
-      </div>
-
-      <span className="font-headline-sm text-[20px] font-bold text-primary leading-none">
-        8.9
-      </span>
-    </div>
+    ))}
   </div>
 </div>
 
@@ -143,9 +217,9 @@ export default function HackathonEvaluations() {
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/5 rounded-full"></div>
             <span className="material-symbols-outlined text-primary text-[32px] mb-4" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
             <h4 className="text-[14px] font-bold text-outline uppercase tracking-wider">Top Scoring Team</h4>
-            <p className="font-headline-sm text-[24px] font-bold text-on-surface mt-2">Team EcoStream</p>
+            <p className="font-headline-sm text-[24px] font-bold text-on-surface mt-2 truncate">{top3[0]?.team_name || "N/A"}</p>
             <div className="flex items-center justify-between mt-4">
-              <span className="text-[36px] font-bold text-primary leading-none">9.7</span>
+              <span className="text-[36px] font-bold text-primary leading-none">{top3[0]?.avg_score?.toFixed(1) || "0.0"}</span>
               <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-[12px] font-bold">Overall Lead</span>
             </div>
           </div>
@@ -153,9 +227,9 @@ export default function HackathonEvaluations() {
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-secondary/5 rounded-full"></div>
             <span className="material-symbols-outlined text-secondary text-[32px] mb-4" style={{ fontVariationSettings: "'FILL' 1" }}>lightbulb</span>
             <h4 className="text-[14px] font-bold text-outline uppercase tracking-wider">Highest Innovation</h4>
-            <p className="font-headline-sm text-[24px] font-bold text-on-surface mt-2">Team TerraMind</p>
+            <p className="font-headline-sm text-[24px] font-bold text-on-surface mt-2 truncate">{top3[1]?.team_name || "N/A"}</p>
             <div className="flex items-center justify-between mt-4">
-              <span className="text-[36px] font-bold text-secondary leading-none">9.8</span>
+              <span className="text-[36px] font-bold text-secondary leading-none">{top3[1]?.max_score?.toFixed(1) || "0.0"}</span>
               <span className="px-3 py-1 bg-secondary/10 text-secondary rounded-full text-[12px] font-bold">Disruptor</span>
             </div>
           </div>
@@ -163,9 +237,9 @@ export default function HackathonEvaluations() {
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-tertiary/5 rounded-full"></div>
             <span className="material-symbols-outlined text-tertiary text-[32px] mb-4" style={{ fontVariationSettings: "'FILL' 1" }}>code</span>
             <h4 className="text-[14px] font-bold text-outline uppercase tracking-wider">Best Technical</h4>
-            <p className="font-headline-sm text-[24px] font-bold text-on-surface mt-2">Team HydroPulse</p>
+            <p className="font-headline-sm text-[24px] font-bold text-on-surface mt-2 truncate">{top3[2]?.team_name || "N/A"}</p>
             <div className="flex items-center justify-between mt-4">
-              <span className="text-[36px] font-bold text-tertiary leading-none">9.6</span>
+              <span className="text-[36px] font-bold text-tertiary leading-none">{top3[2]?.avg_score?.toFixed(1) || "0.0"}</span>
               <span className="px-3 py-1 bg-tertiary/10 text-tertiary rounded-full text-[12px] font-bold">Architectural</span>
             </div>
           </div>
@@ -222,7 +296,7 @@ export default function HackathonEvaluations() {
                 <span className="material-symbols-outlined text-[18px]">filter_list</span> Filters
               </button>
             </div>
-            <button className="text-primary text-[14px] font-bold flex items-center gap-2 hover:underline">
+            <button onClick={handleExportCSV} className="text-primary text-[14px] font-bold flex items-center gap-2 hover:underline">
               <span className="material-symbols-outlined text-[18px]">download</span> Export CSV
             </button>
           </div>
@@ -239,91 +313,60 @@ export default function HackathonEvaluations() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/30">
-                <tr className="hover:bg-surface-container-low/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <p className="font-bold text-[14px] text-on-surface">EcoStream</p>
-                    <p className="text-[11px] font-medium text-outline truncate max-w-[150px] mt-1">Decentralized water filtration...</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-primary-container flex items-center justify-center text-[10px] font-bold text-on-primary">AT</div>
-                      <span className="text-[14px] font-medium">Dr. Aris Thorne</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex gap-2 text-[12px] font-bold">
-                      <span className="text-secondary">9.8</span>
-                      <span className="text-primary">9.4</span>
-                      <span className="text-primary">9.2</span>
-                      <span className="text-primary">9.9</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="font-headline-sm text-[24px] font-bold text-primary leading-none">9.7</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold uppercase rounded-full">Finalized</span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="material-symbols-outlined text-outline hover:text-primary transition-colors mr-2 text-[20px]" title="View Full Feedback">comment</button>
-                    <button className="material-symbols-outlined text-outline hover:text-primary transition-colors text-[20px]">more_vert</button>
-                  </td>
-                </tr>
-                <tr className="hover:bg-surface-container-low/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <p className="font-bold text-[14px] text-on-surface">TerraMind</p>
-                    <p className="text-[11px] font-medium text-outline truncate max-w-[150px] mt-1">AI-driven reforestation...</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-secondary-container flex items-center justify-center text-[10px] font-bold text-on-secondary-container">SJ</div>
-                      <span className="text-[14px] font-medium">Sarah Jenkins</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex gap-2 text-[12px] font-bold">
-                      <span className="text-secondary">9.8</span>
-                      <span className="text-primary">8.2</span>
-                      <span className="text-primary">7.5</span>
-                      <span className="text-primary">8.8</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="font-headline-sm text-[24px] font-bold text-on-surface leading-none">8.9</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="px-3 py-1 bg-tertiary-container/30 text-tertiary text-[10px] font-bold uppercase rounded-full">In Progress</span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="material-symbols-outlined text-outline hover:text-primary transition-colors mr-2 text-[20px]" title="View Full Feedback">comment</button>
-                    <button className="material-symbols-outlined text-outline hover:text-primary transition-colors text-[20px]">more_vert</button>
-                  </td>
-                </tr>
-                <tr className="hover:bg-surface-container-low/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <p className="font-bold text-[14px] text-on-surface">UrbanGrid</p>
-                    <p className="text-[11px] font-medium text-outline truncate max-w-[150px] mt-1">Smart city energy sharing...</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-surface-variant flex items-center justify-center text-[10px] font-bold text-outline">MC</div>
-                      <span className="text-[14px] font-medium">Mark Chen</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-outline-variant italic text-[12px] font-bold">
-                    Scores pending...
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="font-headline-sm text-[24px] font-bold text-outline leading-none">—</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="px-3 py-1 bg-secondary-container/30 text-secondary text-[10px] font-bold uppercase rounded-full">Pending</span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="material-symbols-outlined text-outline hover:text-primary transition-colors mr-2 text-[20px]" title="View Full Feedback">comment</button>
-                    <button className="material-symbols-outlined text-outline hover:text-primary transition-colors text-[20px]">more_vert</button>
-                  </td>
-                </tr>
+                {assignments.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-10 text-outline">No assignments or evaluations found</td>
+                  </tr>
+                ) : (
+                  assignments.map(assignment => {
+                    const evaluation = evaluations.find(e => e.idea_id === assignment.idea_id && e.reviewer_id === assignment.reviewer_id);
+                    const submission = submissions.find(s => (s.idea_id || s.id) === assignment.idea_id);
+                    const team = teams.find(t => (t.team_id || t.id) === submission?.team_id);
+                    const reviewer = reviewers.find(r => (r.reviewer_id || r.id) === assignment.reviewer_id);
+
+                    return (
+                      <tr key={assignment.assignment_id || Math.random()} className="hover:bg-surface-container-low/50 transition-colors">
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-[14px] text-on-surface">{team?.name || submission?.title || "Unknown Team"}</p>
+                          <p className="text-[11px] font-medium text-outline truncate max-w-[150px] mt-1">{submission?.description || "No description provided."}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-surface-variant flex items-center justify-center text-[10px] font-bold text-outline">
+                              {reviewer?.name?.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() || "??"}
+                            </div>
+                            <span className="text-[14px] font-medium">{reviewer?.name || "Unknown Reviewer"}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {evaluation ? (
+                            <div className="flex gap-2 text-[12px] font-bold text-primary">
+                              {evaluation.score}
+                            </div>
+                          ) : (
+                            <span className="text-outline-variant italic text-[12px] font-bold">Scores pending...</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`font-headline-sm text-[24px] font-bold leading-none ${evaluation ? 'text-primary' : 'text-outline'}`}>
+                            {evaluation ? evaluation.score : "—"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {evaluation ? (
+                            <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold uppercase rounded-full">Finalized</span>
+                          ) : (
+                            <span className="px-3 py-1 bg-secondary-container/30 text-secondary text-[10px] font-bold uppercase rounded-full">Pending</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button className="material-symbols-outlined text-outline hover:text-primary transition-colors mr-2 text-[20px]" title={evaluation?.feedback || "View Full Feedback"}>comment</button>
+                          <button className="material-symbols-outlined text-outline hover:text-primary transition-colors text-[20px]">more_vert</button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
