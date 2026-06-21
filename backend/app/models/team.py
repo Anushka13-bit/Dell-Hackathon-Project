@@ -13,3 +13,4 @@ class Team(Base):
     coverage_score = Column(Float, nullable=True)
     diversity_score = Column(Float, nullable=True)
     formation_confidence = Column(Float, nullable=True)
+    problem_statement = Column(Text, nullable=True)

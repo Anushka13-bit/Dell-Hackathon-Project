@@ -43,6 +43,8 @@ export default function Step7Pipeline() {
         }).then(res => {
           if (!res.success) {
             console.error("Failed to register participant via server action:", res.error);
+          } else {
+            state.updateData({ registrationDecision: res.decision });
           }
         }).catch(err => {
           console.error("Error calling submitRegistration:", err);

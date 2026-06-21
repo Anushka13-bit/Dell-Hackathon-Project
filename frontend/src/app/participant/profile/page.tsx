@@ -20,10 +20,22 @@ export default async function ParticipantProfile() {
   const { data: profile } = await supabase
     .from("participants")
     .select("*")
-    .eq("id", user.id)
+    .eq("user_id", user.id)
     .single();
 
-  if (!profile) {
+  // Fallback: some older demo flows may have inserted participant rows using `id===user.id`.
+  // Try that before showing 'Profile Not Found' to reduce UX friction.
+  let finalProfile = profile;
+  if (!finalProfile) {
+    const { data: fallback } = await supabase
+      .from("participants")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+    if (fallback) finalProfile = fallback;
+  }
+
+  if (!finalProfile) {
     return (
       <div className="p-8 max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[60vh]">
         <div className="w-20 h-20 bg-error/10 text-error rounded-full flex items-center justify-center mb-4">
@@ -46,7 +58,7 @@ export default async function ParticipantProfile() {
             <div className="h-px bg-outline-variant/30 flex-1"></div>
         </div>
 
-        <QuickProfileCreator />
+              <QuickProfileCreator />
       </div>
     );
   }
@@ -55,13 +67,13 @@ export default async function ParticipantProfile() {
   let topSkills: [string, number][] = [];
   try {
     // Supabase pgvector JSONB fields often come back as parsed arrays
-    if (profile.skill_vector && typeof profile.skill_vector === 'object') {
+    if (finalProfile.skill_vector && typeof finalProfile.skill_vector === 'object') {
       if (Array.isArray(profile.skill_vector)) {
         // If it's a vector array [0.1, 0.2] it doesn't have labels. 
         // We'll just show declared_skills instead if skill_vector is an array.
       } else {
         // If it's a map {"React": 0.9}
-        topSkills = Object.entries(profile.skill_vector)
+        topSkills = Object.entries(finalProfile.skill_vector)
           .filter((a: any) => a[1] > 0)
           .sort((a: any, b: any) => b[1] - a[1])
           .slice(0, 10) as [string, number][];
@@ -173,11 +185,11 @@ export default async function ParticipantProfile() {
 
             <div className="space-y-6 relative z-10">
               {/* Show extracted parsed skills first */}
-              {profile.declared_skills && profile.declared_skills.length > 0 ? (
+              {finalProfile.declared_skills && finalProfile.declared_skills.length > 0 ? (
                 <div>
                   <h4 className="text-[12px] uppercase tracking-widest font-bold text-on-surface-variant mb-3">Extracted Skills</h4>
                   <div className="flex flex-wrap gap-2">
-                    {profile.declared_skills.map((skill: string, index: number) => (
+                    {finalProfile.declared_skills.map((skill: string, index: number) => (
                       <span key={index} className="px-3 py-1.5 bg-primary/10 text-primary text-[13px] font-bold rounded-lg border border-primary/20">
                         {skill}
                       </span>
@@ -209,10 +221,10 @@ export default async function ParticipantProfile() {
                     ))}
                   </div>
                 </div>
-              ) : profile.skill_vector?.status === 'processing' ? (
-                <SkillExtractionStatus userId={profile.user_id} />
+              ) : finalProfile.skill_vector?.status === 'processing' ? (
+                <SkillExtractionStatus userId={finalProfile.user_id} />
               ) : (
-                !profile.declared_skills?.length && (
+                !finalProfile.declared_skills?.length && (
                   <div className="text-on-surface-variant text-[14px] italic">No skills listed or extracted.</div>
                 )
               )}

@@ -1,40 +1,28 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Trophy, Code2, Leaf, Sparkles } from "lucide-react";
 
 export default function ParticipantChallenges() {
-  const challenges = [
-    {
-      id: 1,
-      title: "Best Use of AI & ML",
-      sponsor: "Google Cloud",
-      prize: "$5,000",
-      description: "Build an innovative application that utilizes advanced AI models to solve a real-world problem.",
-      icon: <Sparkles className="w-8 h-8 text-primary" />,
-      color: "bg-primary-container text-on-primary-container",
-      tags: ["AI", "Machine Learning", "GCP"]
-    },
-    {
-      id: 2,
-      title: "Sustainability Hack",
-      sponsor: "Dell Technologies",
-      prize: "$3,500",
-      description: "Create a solution that promotes environmental sustainability, reduces waste, or optimizes energy consumption.",
-      icon: <Leaf className="w-8 h-8 text-green-600" />,
-      color: "bg-green-100 text-green-800",
-      tags: ["Green Tech", "IoT", "Data"]
-    },
-    {
-      id: 3,
-      title: "Open Source Contributor",
-      sponsor: "GitHub",
-      prize: "$2,000",
-      description: "The team that makes the most significant contribution to an existing open-source project during the event.",
-      icon: <Code2 className="w-8 h-8 text-blue-600" />,
-      color: "bg-blue-100 text-blue-800",
-      tags: ["Open Source", "Community"]
-    }
-  ];
+  const [challenges, setChallenges] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    setLoading(true);
+    fetch(`${apiUrl}/problem-statements/`)
+      .then(async (r) => { if (!r.ok) throw new Error(`Status ${r.status}`); return r.json(); })
+      .then((data) => {
+        setChallenges((data || []).map((ps: any) => ({
+          id: ps.ps_id,
+          title: ps.title,
+          description: ps.raw_text,
+          required_vector: ps.required_vector,
+        })));
+      })
+      .catch((e) => { console.error("Failed to load problem statements:", e); setChallenges([]); })
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -46,42 +34,42 @@ export default function ParticipantChallenges() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {challenges.map((challenge) => (
-          <div key={challenge.id} className="bg-white rounded-3xl border border-outline-variant/30 overflow-hidden flex flex-col hover:shadow-xl transition-shadow duration-300 group">
-            <div className={`h-24 ${challenge.color} flex items-center justify-between px-6`}>
-              <div className="w-14 h-14 bg-white/50 rounded-2xl flex items-center justify-center backdrop-blur-sm shadow-sm group-hover:scale-110 transition-transform">
-                {challenge.icon}
-              </div>
-              <div className="flex flex-col items-end">
-                <span className="text-[12px] font-bold uppercase tracking-wider opacity-80">Prize Pool</span>
-                <span className="text-[24px] font-bold">{challenge.prize}</span>
-              </div>
-            </div>
-            
-            <div className="p-6 flex-1 flex flex-col">
-              <div className="mb-4">
-                <span className="text-[12px] font-bold text-on-surface-variant uppercase tracking-widest mb-1 block">Sponsored by {challenge.sponsor}</span>
-                <h3 className="text-[20px] font-bold text-on-surface leading-tight">{challenge.title}</h3>
-              </div>
-              
-              <p className="text-[14px] text-on-surface-variant mb-6 flex-1">
-                {challenge.description}
-              </p>
-
-              <div className="flex flex-wrap gap-2 mb-6">
-                {challenge.tags.map(tag => (
-                  <span key={tag} className="px-3 py-1 bg-surface-container-low text-on-surface text-[11px] font-bold rounded-lg uppercase tracking-wider border border-outline-variant/20">
-                    {tag}
-                  </span>
-                ))}
+        {loading ? (
+          <div className="text-on-surface-variant">Loading challenges...</div>
+        ) : challenges.length === 0 ? (
+          <div className="text-on-surface-variant">No problem statements available.</div>
+        ) : (
+          challenges.map((challenge) => (
+            <div key={challenge.id} className="bg-white rounded-3xl border border-outline-variant/30 overflow-hidden flex flex-col hover:shadow-xl transition-shadow duration-300 group">
+              <div className={`h-24 bg-primary-container flex items-center justify-between px-6`}>
+                <div className="w-14 h-14 bg-white/50 rounded-2xl flex items-center justify-center backdrop-blur-sm shadow-sm group-hover:scale-110 transition-transform">
+                  <Sparkles className="w-8 h-8 text-primary" />
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-[12px] font-bold uppercase tracking-wider opacity-80">Problem</span>
+                </div>
               </div>
 
-              <button className="w-full bg-surface-container-low border border-outline-variant/30 py-3 rounded-xl font-bold text-[14px] text-primary hover:bg-primary/5 transition-colors">
-                View Requirements
-              </button>
+              <div className="p-6 flex-1 flex flex-col">
+                <div className="mb-4">
+                  <h3 className="text-[20px] font-bold text-on-surface leading-tight">{challenge.title}</h3>
+                </div>
+                <p className="text-[14px] text-on-surface-variant mb-6 flex-1">{challenge.description}</p>
+
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {/* show required_vector keys */}
+                  {challenge.required_vector && Object.keys(challenge.required_vector).slice(0,5).map((k: string) => (
+                    <span key={k} className="px-3 py-1 bg-surface-container-low text-on-surface text-[11px] font-bold rounded-lg uppercase tracking-wider border border-outline-variant/20">{k}</span>
+                  ))}
+                </div>
+
+                <button className="w-full bg-surface-container-low border border-outline-variant/30 py-3 rounded-xl font-bold text-[14px] text-primary hover:bg-primary/5 transition-colors">
+                  View Requirements
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
       
       {/* Overall Grand Prize */}

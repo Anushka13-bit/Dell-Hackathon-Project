@@ -8,6 +8,7 @@ class Participant(Base):
     __tablename__ = "participants"
 
     id = Column(Text, primary_key=True)
+    user_id = Column(UUID(as_uuid=True), nullable=True)
     name = Column(Text, nullable=True)
     college_name = Column(Text, nullable=True)
     github_url = Column(Text, nullable=True)

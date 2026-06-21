@@ -1,13 +1,13 @@
 "use client";
 
 import { useOnboardingStore } from "@/store/useOnboardingStore";
-import { ArrowRight, CheckCircle2, QrCode, Code2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, QrCode, Code2, Clock } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function Step7Success() {
-  const { fullName, updateData, aiData } = useOnboardingStore();
+  const { fullName, updateData, aiData, registrationDecision } = useOnboardingStore();
   const router = useRouter();
   const [participantId] = useState(() => {
     const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -35,23 +35,42 @@ export default function Step7Success() {
       className="w-full bg-surface-container-low border border-outline-variant/20 p-8 md:p-12 rounded-[40px] shadow-2xl relative overflow-hidden"
     >
       <div className="relative z-10 flex flex-col items-center text-center">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.2 }}
-          className="mb-6"
-        >
-          <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center">
-            <CheckCircle2 className="w-10 h-10 text-primary" />
-          </div>
-        </motion.div>
+        {registrationDecision && registrationDecision !== 'AUTO_APPROVED' ? (
+          <>
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.2 }}
+              className="mb-6"
+            >
+              <div className="w-20 h-20 bg-secondary/10 rounded-full flex items-center justify-center">
+                <Clock className="w-10 h-10 text-secondary" />
+              </div>
+            </motion.div>
+            <h1 className="text-[36px] font-bold mb-2 tracking-tight leading-tight text-on-surface">Application under review</h1>
+            <p className="text-on-surface-variant text-[16px] mb-8 max-w-md">
+              Thanks for applying, <span className="font-bold text-primary">{fullName.split(" ")[0] || "Hacker"}</span>. Your profile requires a manual review by an organizer to ensure a high-quality cohort. We'll notify you by email once approved!
+            </p>
+          </>
+        ) : (
+          <>
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.2 }}
+              className="mb-6"
+            >
+              <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="w-10 h-10 text-primary" />
+              </div>
+            </motion.div>
 
-        <h1 className="text-[36px] font-bold mb-2 tracking-tight leading-tight text-on-surface">You're ready to build.</h1>
-        <p className="text-on-surface-variant text-[16px] mb-8 max-w-md">
-          Your HackOS profile has been created securely. Welcome to the future of innovation, <span className="font-bold text-primary">{fullName.split(" ")[0] || "Hacker"}</span>.
-        </p>
+            <h1 className="text-[36px] font-bold mb-2 tracking-tight leading-tight text-on-surface">You're ready to build.</h1>
+            <p className="text-on-surface-variant text-[16px] mb-8 max-w-md">
+              Your HackOS profile has been created securely. Welcome to the future of innovation, <span className="font-bold text-primary">{fullName.split(" ")[0] || "Hacker"}</span>.
+            </p>
 
-        {/* Digital Badge Preview */}
+            {/* Digital Badge Preview */}
         <motion.div 
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -123,6 +142,8 @@ export default function Step7Success() {
           Enter Dashboard
           <ArrowRight className="w-5 h-5" />
         </motion.button>
+        </>
+        )}
       </div>
     </motion.div>
   );

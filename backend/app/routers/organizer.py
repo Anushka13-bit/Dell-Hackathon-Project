@@ -232,7 +232,7 @@ async def submit_registration(payload: SubmitRegistrationPayload, db: Session = 
         db.commit()
 
     if decision == 'AUTO_APPROVED':
-        p = db.query(Participant).filter(Participant.id == payload.user_id).first()
+        p = db.query(Participant).filter(Participant.user_id == payload.user_id).first()
         if p:
             p.name = payload.name
             p.college_name = payload.college
@@ -246,7 +246,8 @@ async def submit_registration(payload: SubmitRegistrationPayload, db: Session = 
             db.commit()
         else:
             p = Participant(
-                id=payload.user_id,
+                id=str(uuid.uuid4()),
+                user_id=payload.user_id,
                 name=payload.name,
                 college_name=payload.college,
                 github_url=payload.github,
@@ -284,10 +285,11 @@ async def approve_registration(registration_id: str, db: Session = Depends(get_d
     reg.decision = 'AUTO_APPROVED'
     db.commit()
 
-    p = db.query(Participant).filter(Participant.id == str(reg.user_id)).first()
+    p = db.query(Participant).filter(Participant.user_id == str(reg.user_id)).first()
     if not p:
         p = Participant(
-            id=str(reg.user_id),
+            id=str(uuid.uuid4()),
+            user_id=str(reg.user_id),
             name=reg.name,
             college_name=reg.college,
             github_url=reg.github,

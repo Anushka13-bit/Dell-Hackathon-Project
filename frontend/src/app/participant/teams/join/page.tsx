@@ -1,244 +1,458 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useOnboardingStore } from "@/store/useOnboardingStore";
 import { createClient } from "@/utils/supabase/client";
+import { getApiBaseUrl } from "@/lib/api";
 
-const MOCK_OPEN_TEAMS = [
-  {
-    id: "t1",
-    name: "EcoStream",
-    domain: "Urban Tech",
-    description: "Real-time monitoring of urban water waste using IoT sensors and edge computing for smarter city management.",
-    readiness: "Robust",
-    readinessColor: "text-primary",
-    theme: "primary",
-    skills: ["Python", "React", "IoT"],
-    missingRole: "Frontend Fit",
-    requiredVector: { frontend: 0.8, hardware: 0.3, backend: 0.5 } as Record<string, number>,
-  },
-  {
-    id: "t2",
-    name: "BioSynth AI",
-    domain: "Biotech",
-    description: "Using generative AI to accelerate the discovery of plastic-eating enzymes for industrial recycling.",
-    readiness: "Growing",
-    readinessColor: "text-secondary",
-    theme: "secondary",
-    skills: ["GenAI", "Python", "Bioinformatics"],
-    missingRole: "Domain Expert",
-    requiredVector: { ai_ml: 0.9, data_science: 0.6, biotech: 0.8 } as Record<string, number>,
-  },
-  {
-    id: "t3",
-    name: "Urban Canopy",
-    domain: "Urban Tech",
-    description: "AI-driven rooftop garden optimization for heat island reduction.",
-    readiness: "Robust",
-    readinessColor: "text-primary",
-    theme: "primary",
-    skills: ["Python", "React Native", "GIS"],
-    missingRole: "Mobile Developer",
-    requiredVector: { mobile: 0.8, ui_ux: 0.5, data_science: 0.4 } as Record<string, number>,
-  },
-  {
-    id: "t4",
-    name: "Solar Trace",
-    domain: "Sustainability",
-    description: "Blockchain ledger for transparent community solar energy sharing.",
-    readiness: "Forming",
-    readinessColor: "text-tertiary",
-    theme: "tertiary",
-    skills: ["Solidity", "Node.js"],
-    missingRole: "Backend Dev",
-    requiredVector: { blockchain: 0.9, backend: 0.8 } as Record<string, number>,
-  }
-];
+type Participant = {
+  id: string;
+  name?: string;
+  declared_skills?: string[];
+  skill_vector?: Record<string, number>;
+  github_url?: string;
+  college_name?: string;
+  avatar?: string;
+};
+
+type Team = {
+  team_id: string;
+  name?: string;
+  member_ids?: string[];
+  member_count?: number;
+  max_team_size?: number;
+  slots_remaining?: number;
+  coverage_score?: number;
+  diversity_score?: number;
+  formation_confidence?: number;
+  required_vector?: Record<string, number>;
+  requiredVector?: Record<string, number>;
+  description?: string;
+  problem_statement?: string;
+  problem_statement_description?: string;
+  theme?: string;
+  created_at?: string;
+};
+
+function normalizeId(value: string) {
+  return value.toLowerCase().trim();
+}
+
+function normalizeSkill(value: string) {
+  return value?.toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+function formatCoverageScore(score?: number | null) {
+  if (score == null || Number.isNaN(score)) return null;
+  const normalized = score <= 1 ? score * 100 : score;
+  return Math.round(normalized);
+}
 
 function calculateMatch(participantVector: Record<string, number> | undefined, requiredVector: Record<string, number>) {
   if (!participantVector) return 0;
   let score = 0;
   let maxPossible = 0;
-  
+
   for (const [skill, weight] of Object.entries(requiredVector)) {
     maxPossible += weight;
     if (participantVector[skill]) {
       score += participantVector[skill] * weight;
     }
   }
-  
+
   if (maxPossible === 0) return 0;
   return Math.round((score / maxPossible) * 100);
+}
+
+function getMemberRole(member: Participant) {
+  const skills = (member.declared_skills || []).map(normalizeSkill).join(" ");
+  if (skills.match(/react|next|vue|html|css|frontend/)) return "Frontend";
+  if (skills.match(/node|python|java|dotnet|backend|api|fastapi|flask/)) return "Backend";
+  if (skills.match(/ml|ai|tensorflow|pytorch|scikit|data/)) return "AI";
+  if (skills.match(/aws|azure|gcp|cloud|docker|kubernetes|devops/)) return "Cloud";
+  if (skills.match(/figma|ux|ui|design|product/)) return "Design";
+  return "Contributor";
+}
+
+function getTeamDescription(team: Team) {
+  return team.problem_statement_description || team.problem_statement || team.description || "";
+}
+
+function getApiErrorMessage(errorBody: unknown, fallback: string) {
+  if (!errorBody || typeof errorBody !== "object") return fallback;
+  const body = errorBody as { error?: unknown; detail?: unknown };
+  const value = body.error ?? body.detail;
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => {
+      if (typeof item === "string") return item;
+      if (item && typeof item === "object" && "msg" in item) return String(item.msg);
+      return String(item);
+    }).join(", ");
+  }
+  return fallback;
 }
 
 export default function JoinTeam() {
   const { aiData } = useOnboardingStore();
   const participantVector = aiData?.skill_vector;
   const [requestingId, setRequestingId] = useState<string | null>(null);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [loadingTeams, setLoadingTeams] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState("best_coverage");
+
+  const loadTeams = useCallback(async () => {
+    const apiUrl = getApiBaseUrl();
+    setLoadingTeams(true);
+    setFetchError(null);
+
+    try {
+      const [teamsResponse, participantsResponse] = await Promise.all([
+        fetch(`${apiUrl}/teams`),
+        fetch(`${apiUrl}/participants`),
+      ]);
+
+      if (!teamsResponse.ok) {
+        throw new Error(`Teams request failed (${teamsResponse.status})`);
+      }
+      if (!participantsResponse.ok) {
+        throw new Error(`Participants request failed (${participantsResponse.status})`);
+      }
+
+      const [teamData, participantData] = await Promise.all([
+        teamsResponse.json(),
+        participantsResponse.json(),
+      ]);
+
+      setTeams(teamData || []);
+      setParticipants(participantData || []);
+    } catch (error) {
+      console.error("Failed to fetch join page data:", error);
+      setTeams([]);
+      setParticipants([]);
+      setFetchError(
+        error instanceof Error
+          ? error.message
+          : "Unable to reach the backend. Start the API server with `uvicorn app.main:app --reload`."
+      );
+    } finally {
+      setLoadingTeams(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadTeams();
+  }, [loadTeams]);
+
+  const participantById = useMemo(
+    () => new Map(participants.map((participant) => [normalizeId(participant.id), participant])),
+    [participants]
+  );
+
+  const enrichedTeams = useMemo(() => teams.map((team) => {
+    const memberIds = (team.member_ids || []).map(String);
+    const teamParticipants = memberIds
+      .map((id) => participantById.get(normalizeId(id)))
+      .filter((member): member is Participant => Boolean(member));
+
+    const requiredVector = team.required_vector || team.requiredVector || {};
+    const matchScore = calculateMatch(participantVector, requiredVector);
+    const requiredSkills = Object.keys(requiredVector).filter(Boolean);
+    const memberCount = team.member_count ?? teamParticipants.length;
+    const maxTeamSize = team.max_team_size ?? Math.max(memberCount, 1);
+    const slotsRemaining = team.slots_remaining ?? Math.max(0, maxTeamSize - memberCount);
+    const coverageScore = formatCoverageScore(team.coverage_score);
+
+    return {
+      ...team,
+      memberProfiles: teamParticipants,
+      matchScore,
+      requiredSkills,
+      memberCount,
+      maxTeamSize,
+      slotsRemaining,
+      coverageScore,
+      isFull: slotsRemaining <= 0,
+      descriptionText: getTeamDescription(team),
+    };
+  }), [teams, participantById, participantVector]);
+
+  const searchLower = searchTerm.toLowerCase();
+  const filteredTeams = enrichedTeams.filter((team) => {
+    const text = [
+      team.name,
+      team.problem_statement,
+      team.theme,
+      team.description,
+      ...(team.requiredSkills || []),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return text.includes(searchLower);
+  });
+
+  const finalTeams = useMemo(() => {
+    return [...filteredTeams].sort((a, b) => {
+      switch (sortBy) {
+        case "recently_created":
+          return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime();
+        case "least_members":
+          return (a.memberCount || 0) - (b.memberCount || 0);
+        case "highest_match":
+          return (b.matchScore || 0) - (a.matchScore || 0);
+        case "best_coverage":
+        default:
+          return (b.coverageScore || 0) - (a.coverageScore || 0);
+      }
+    });
+  }, [filteredTeams, sortBy]);
+
+  const recommendedTeam = useMemo(() => {
+    const openTeams = finalTeams.filter((team) => !team.isFull);
+    if (openTeams.length === 0) return null;
+    return [...openTeams].sort((a, b) => (b.coverageScore || 0) - (a.coverageScore || 0))[0];
+  }, [finalTeams]);
 
   const handleJoinRequest = async (teamId: string) => {
     try {
       setRequestingId(teamId);
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
-      
       if (!session?.user?.id) {
-        alert("You must be logged in to request to join a team.");
+        alert("Please log in to request a team invitation.");
         return;
       }
-
-      const payload = { participant_id: session.user.id };
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${apiUrl}/teams/${teamId}/request-join`, {
+      const apiUrl = getApiBaseUrl();
+      const payload = {
+        participant_id: session.user.id,
+        participant_email: session.user.email || undefined,
+      };
+      const response = await fetch(`${apiUrl}/teams/${teamId}/request-join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
-
-      if (res.ok) {
-        alert("Join request sent!");
-      } else {
-        alert("Failed to send join request. Team might not exist in local db yet.");
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
+        throw new Error(getApiErrorMessage(errorBody, "Join request failed"));
       }
-    } catch (e) {
-      console.error(e);
+      alert("Request sent — the team lead will review it.");
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : "Unable to send your join request right now.");
     } finally {
       setRequestingId(null);
     }
   };
 
-  const sortedTeams = [...MOCK_OPEN_TEAMS].map(team => ({
-    ...team,
-    matchScore: calculateMatch(participantVector, team.requiredVector)
-  })).sort((a, b) => b.matchScore - a.matchScore);
-
-  const recommendedTeams = sortedTeams.filter(t => t.matchScore >= 50);
-  const otherTeams = sortedTeams.filter(t => t.matchScore < 50);
-
   return (
-    <div className="flex max-w-[1400px] mx-auto">
-      {/* Main Content Area */}
-      <main className="flex-1 p-6 lg:p-margin-desktop bg-background min-h-[calc(100vh-80px)]">
-        <div className="flex flex-col gap-stack-lg">
-          {/* Hero Section */}
-          <header>
-            <h1 className="font-display-lg text-[32px] md:text-[48px] mb-2">Find Your Perfect Squad</h1>
-            <p className="text-body-lg text-on-surface-variant max-w-2xl">Our AI analyzes your unique skill set to match you with teams tackling the world's most pressing sustainability and biotech challenges.</p>
-          </header>
+    <div className="min-h-screen bg-background py-8">
+      <main className="max-w-5xl mx-auto px-6 lg:px-margin-desktop space-y-8">
+        <header className="space-y-2">
+          <h1 className="font-display-lg text-[32px] md:text-[40px] text-on-surface">Join a team</h1>
+          <p className="text-body-md text-on-surface-variant">
+            Browse open teams and send a join request to the team lead.
+          </p>
+        </header>
 
-          {/* Metrics Ribbon */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-3xl shadow-[0_20px_30px_-10px_rgba(214,203,191,0.3)] border border-surface-container-highest">
-              <span className="text-label-sm text-on-surface-variant uppercase tracking-widest">Available Teams</span>
-              <div className="text-[32px] font-headline-md mt-1">{MOCK_OPEN_TEAMS.length}</div>
-            </div>
-            <div className="bg-primary-container/20 p-6 rounded-3xl shadow-[0_20px_30px_-10px_rgba(214,203,191,0.3)] border border-primary/10">
-              <span className="text-label-sm text-primary uppercase tracking-widest">AI Recommended</span>
-              <div className="text-[32px] font-headline-md mt-1 text-primary">{recommendedTeams.length}</div>
-            </div>
-            <div className="bg-white p-6 rounded-3xl shadow-[0_20px_30px_-10px_rgba(214,203,191,0.3)] border border-surface-container-highest">
-              <span className="text-label-sm text-on-surface-variant uppercase tracking-widest">Open Roles</span>
-              <div className="text-[32px] font-headline-md mt-1">12</div>
-            </div>
-            <div className="bg-white p-6 rounded-3xl shadow-[0_20px_30px_-10px_rgba(214,203,191,0.3)] border border-surface-container-highest">
-              <span className="text-label-sm text-on-surface-variant uppercase tracking-widest">Requests Sent</span>
-              <div className="text-[32px] font-headline-md mt-1">0</div>
-            </div>
-          </div>
-
-          {/* AI Recommended Teams Section */}
-          {recommendedTeams.length > 0 && (
-            <section>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="font-headline-sm text-[24px] flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>
-                  Recommended for You
-                </h2>
-              </div>
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                {recommendedTeams.map((team, idx) => (
-                  <div key={team.id} className="group relative bg-white rounded-[32px] overflow-hidden border border-surface-container-highest transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
-                    <div className={`h-32 bg-${team.theme}-container/10 flex items-end p-6`}>
-                      <div className="flex justify-between w-full items-end">
-                        <div className={`bg-${team.theme} text-white px-3 py-1 rounded-full text-label-sm font-semibold`}>{team.matchScore}% Match</div>
-                      </div>
-                    </div>
-                    <div className="p-6 space-y-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-headline-sm text-[24px]">{team.name}</h3>
-                          <span className={`inline-block mt-1 px-2 py-0.5 bg-${team.theme}-container text-on-${team.theme}-container rounded text-label-sm font-semibold`}>{team.missingRole} Needed</span>
-                        </div>
-                      </div>
-                      <p className="text-on-surface-variant text-body-md line-clamp-2">{team.description}</p>
-                      <div className="space-y-3">
-                        <div className="flex justify-between text-label-sm text-on-surface-variant">
-                          <span>Team Skill Coverage</span>
-                          <span className="font-bold">{team.matchScore}%</span>
-                        </div>
-                        <div className="h-2 w-full bg-surface-container rounded-full overflow-hidden">
-                          <div className={`h-full bg-${team.theme}`} style={{ width: `${team.matchScore}%` }}></div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 pt-2">
-                        <button 
-                          onClick={() => handleJoinRequest(team.id)}
-                          disabled={requestingId === team.id}
-                          className="flex-1 flex justify-center py-3 px-4 rounded-2xl bg-primary text-white font-medium hover:opacity-90 transition-all disabled:opacity-50"
-                        >
-                          {requestingId === team.id ? "Sending..." : "Request to Join"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Available Teams List */}
-          <section>
-            <h2 className="font-headline-sm text-[24px] mb-6">Available Teams</h2>
-            <div className="flex flex-col gap-6">
-              {otherTeams.map(team => (
-                <div key={team.id} className="bg-white p-6 rounded-[32px] border border-surface-container-highest hover:border-primary-container transition-all grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-                  <div className="md:col-span-3">
-                    <h4 className="font-semibold text-body-lg">{team.name}</h4>
-                    <p className={`text-label-sm ${team.readinessColor} font-medium`}>{team.domain}</p>
-                  </div>
-                  <div className="md:col-span-4">
-                    <p className="text-on-surface-variant text-label-md line-clamp-1">{team.description}</p>
-                    <div className="flex gap-1 mt-2">
-                      {team.skills.map(skill => (
-                        <span key={skill} className="px-2 py-0.5 bg-surface-container-low rounded-full text-[10px] uppercase tracking-tighter">{skill}</span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="md:col-span-2 flex flex-col items-center">
-                    <span className="text-label-sm text-on-surface-variant">Readiness</span>
-                    <span className={`font-bold ${team.readinessColor}`}>{team.readiness}</span>
-                  </div>
-                  <div className="md:col-span-3 flex justify-end gap-2">
-                    <span className="px-3 py-1 bg-surface-container-low text-on-surface-variant rounded-full text-[12px] font-bold flex items-center">{team.matchScore}% Match</span>
-                    <button 
-                      onClick={() => handleJoinRequest(team.id)}
-                      disabled={requestingId === team.id}
-                      className="px-4 py-2 bg-surface-container-high text-on-surface font-medium rounded-xl hover:bg-surface-container-highest transition-all disabled:opacity-50"
-                    >
-                      {requestingId === team.id ? "..." : "Request"}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {recommendedTeam && (
+          <section className="rounded-2xl border border-primary/20 bg-primary-container/10 p-5">
+            <p className="text-label-sm uppercase tracking-wide text-primary">AI suggestion</p>
+            <p className="mt-2 text-body-md text-on-surface">
+              <span className="font-semibold">{recommendedTeam.name || "This team"}</span>
+              {" "}has the best skill coverage
+              {recommendedTeam.coverageScore != null ? ` (${recommendedTeam.coverageScore}%)` : ""}
+              {" "}among teams with open spots.
+            </p>
           </section>
-        </div>
-      </main>
+        )}
 
-      {/* Right Side Panel (AI Insights) */}
-      
+        <section className="rounded-2xl border border-outline-variant/20 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <label className="flex flex-1 flex-col gap-2">
+              <span className="text-label-sm text-on-surface-variant">Search teams</span>
+              <input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Team name, theme, or skill"
+                className="rounded-xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-body-md outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              />
+            </label>
+            <label className="flex w-full flex-col gap-2 sm:w-48">
+              <span className="text-label-sm text-on-surface-variant">Sort by</span>
+              <select
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value)}
+                className="rounded-xl border border-outline-variant/70 bg-surface-container-low px-4 py-3 text-body-md outline-none"
+              >
+                <option value="best_coverage">Best coverage</option>
+                <option value="highest_match">Best match</option>
+                <option value="recently_created">Newest</option>
+                <option value="least_members">Fewest members</option>
+              </select>
+            </label>
+          </div>
+          <p className="mt-4 text-body-sm text-on-surface-variant">
+            {finalTeams.length} team{finalTeams.length === 1 ? "" : "s"} available
+          </p>
+        </section>
+
+        <section className="space-y-4">
+          {fetchError && (
+            <div className="rounded-2xl border border-error/20 bg-error-container/20 p-5 text-on-surface">
+              <p className="font-medium">Could not load teams</p>
+              <p className="mt-1 text-body-sm text-on-surface-variant">{fetchError}</p>
+              <button
+                type="button"
+                onClick={loadTeams}
+                className="mt-4 rounded-xl border border-outline-variant/20 px-4 py-2 text-sm font-medium hover:bg-surface-container-low"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {loadingTeams ? (
+            <div className="rounded-2xl border border-outline-variant/20 bg-white p-12 text-center text-on-surface-variant">
+              Loading teams...
+            </div>
+          ) : finalTeams.length === 0 ? (
+            <div className="rounded-2xl border border-outline-variant/20 bg-white p-12 text-center text-on-surface-variant">
+              No teams match your search. Try a different keyword.
+            </div>
+          ) : (
+            finalTeams.map((team) => {
+              const isRecommended = recommendedTeam?.team_id === team.team_id;
+
+              return (
+                <article
+                  key={team.team_id}
+                  className={`rounded-2xl border bg-white p-6 shadow-sm ${
+                    isRecommended ? "border-primary/30 ring-1 ring-primary/10" : "border-outline-variant/20"
+                  }`}
+                >
+                  <div className="space-y-5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="space-y-3 min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {isRecommended && (
+                            <span className="rounded-full bg-primary px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-white">
+                              AI pick
+                            </span>
+                          )}
+                          {team.theme && (
+                            <span className="rounded-full bg-surface-container-high px-3 py-1 text-[11px] uppercase tracking-wide text-on-surface-variant">
+                              {team.theme}
+                            </span>
+                          )}
+                          <span className="rounded-full bg-surface-container-high px-3 py-1 text-[11px] uppercase tracking-wide text-on-surface-variant">
+                            {team.memberCount}/{team.maxTeamSize} members
+                          </span>
+                          {team.coverageScore != null && (
+                            <span className="rounded-full bg-secondary-container px-3 py-1 text-[11px] font-medium text-on-secondary-container">
+                              {team.coverageScore}% coverage
+                            </span>
+                          )}
+                          {team.isFull && (
+                            <span className="rounded-full bg-error-container px-3 py-1 text-[11px] font-medium text-error">
+                              Full
+                            </span>
+                          )}
+                          {team.matchScore > 0 && (
+                            <span className="rounded-full bg-primary-container/15 px-3 py-1 text-[11px] font-medium text-primary">
+                              {team.matchScore}% match
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <h2 className="font-headline-md text-[22px] text-on-surface">{team.name || "Unnamed team"}</h2>
+                          {team.descriptionText && (
+                            <p className="mt-2 text-body-md text-on-surface-variant">
+                              {team.descriptionText}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleJoinRequest(team.team_id)}
+                        disabled={requestingId === team.team_id || team.isFull}
+                        className="shrink-0 rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-white hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {team.isFull
+                          ? "Team full"
+                          : requestingId === team.team_id
+                            ? "Sending..."
+                            : "Request to join"}
+                      </button>
+                    </div>
+
+                    {(team.problem_statement || team.theme) && (
+                      <div className="grid gap-4 sm:grid-cols-2 rounded-xl border border-outline-variant/10 bg-surface-container-low p-4">
+                        {team.theme && (
+                          <div>
+                            <p className="text-label-sm text-on-surface-variant">Theme</p>
+                            <p className="mt-1 text-body-md text-on-surface">{team.theme}</p>
+                          </div>
+                        )}
+                        {team.problem_statement && team.problem_statement !== team.descriptionText && (
+                          <div>
+                            <p className="text-label-sm text-on-surface-variant">Problem</p>
+                            <p className="mt-1 text-body-md text-on-surface">{team.problem_statement}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {(team.memberProfiles || []).length > 0 && (
+                      <div>
+                        <p className="text-label-sm text-on-surface-variant mb-3">Members</p>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {(team.memberProfiles || []).map((member) => (
+                            <div
+                              key={member.id}
+                              className="flex items-center gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-low p-3"
+                            >
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary-container text-sm font-semibold text-secondary">
+                                {member.name?.charAt(0) ?? member.id.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-medium text-on-surface">{member.name || "Participant"}</p>
+                                <p className="text-[12px] text-on-surface-variant">{getMemberRole(member)}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(team.requiredSkills || []).length > 0 && (
+                      <div>
+                        <p className="text-label-sm text-on-surface-variant mb-3">Skills needed</p>
+                        <div className="flex flex-wrap gap-2">
+                          {team.requiredSkills.map((skill) => (
+                            <span
+                              key={skill}
+                              className="rounded-full bg-secondary-container px-3 py-1 text-[12px] text-on-secondary-container"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </article>
+              );
+            })
+          )}
+        </section>
+      </main>
     </div>
   );
 }

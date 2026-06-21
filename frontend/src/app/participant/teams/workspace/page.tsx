@@ -3,23 +3,115 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { createClient } from "@/utils/supabase/client";
+import { getApiBaseUrl } from "@/lib/api";
+
 export default function TeamWorkspace() {
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
-  const [projectTitle, setProjectTitle] = useState("EcoStream Hackathon Project");
+  const [projectTitle, setProjectTitle] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
+  const [problemStatement, setProblemStatement] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deckFile, setDeckFile] = useState<File | null>(null);
+  const [githubUrl, setGithubUrl] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [team, setTeam] = useState<any>(null);
+  const [members, setMembers] = useState<any[]>([]);
+  const [participant, setParticipant] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchTeamData = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user?.id) return;
+
+        const apiBase = getApiBaseUrl();
+        const pRes = await fetch(`${apiBase}/participants/${session.user.id}`);
+        if (!pRes.ok) return;
+        const pData = await pRes.json();
+        setParticipant(pData);
+
+        if (pData.team_id) {
+          const tRes = await fetch(`${apiBase}/teams/${pData.team_id}`);
+          if (tRes.ok) {
+            const tData = await tRes.json();
+            setTeam(tData);
+            setProjectTitle(tData.name || "Project");
+            setProblemStatement(tData.problem_statement || "");
+
+            const teamMembers = [];
+            for (const mid of tData.member_ids || []) {
+              const mRes = await fetch(`${apiBase}/participants/${mid}`);
+              if (mRes.ok) teamMembers.push(await mRes.json());
+            }
+            setMembers(teamMembers);
+
+            const subRes = await fetch(`${apiBase}/submissions/team/${pData.team_id}`);
+            if (subRes.ok) {
+              const subs = await subRes.json();
+              if (subs.length > 0) {
+                const latest = subs[subs.length - 1];
+                setProjectTitle(latest.title || tData.name);
+                setProjectDescription(latest.description || "");
+                setGithubUrl(latest.github_url || "");
+                setVideoUrl(latest.video_url || "");
+                if (latest.ai_feedback) setAiFeedback(latest.ai_feedback);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchTeamData();
+  }, []);
 
   const handleSubmission = async () => {
     try {
+      if (!team?.team_id) {
+        alert("No team found. Create a team first.");
+        return;
+      }
       setIsSubmitting(true);
+      const deckUrl = await uploadDeck();
       const payload = {
-        team_id: "demo-team-id", // Mock team ID for demo
+        team_id: team.team_id,
         title: projectTitle,
-        description: projectDescription
+        description: projectDescription,
+        github_url: githubUrl || undefined,
+        video_url: videoUrl || undefined,
+        ppt_url: deckUrl || undefined
       };
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${apiUrl}/submissions/`, {
+      async function uploadDeck() {
+        if (!deckFile || !team) return null;
+
+        const supabase = createClient();
+
+        const fileName = `${team.team_id}/${Date.now()}-${deckFile.name}`;
+
+        const { data, error } = await supabase.storage
+          .from("decks")
+          .upload(fileName, deckFile);
+
+        if (error) {
+          console.error(error);
+          return null;
+        }
+
+        const {
+          data: { publicUrl },
+        } = supabase.storage
+          .from("decks")
+          .getPublicUrl(fileName);
+
+        return publicUrl;
+      };
+
+      const apiBase = getApiBaseUrl();
+      const res = await fetch(`${apiBase}/submissions/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -37,22 +129,35 @@ export default function TeamWorkspace() {
     }
   };
 
+  const saveProblemStatement = async () => {
+    if (!team?.team_id) return;
+
+    const apiBase = getApiBaseUrl();
+
+    await fetch(`${apiBase}/teams/${team.team_id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...team,
+        problem_statement: problemStatement,
+      }),
+    });
+  };
+
   useEffect(() => {
-    // Attempt to fetch submissions and see if any have AI feedback generated
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/submissions/`)
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          const submissionWithFeedback = data.find((s: any) => s.ai_feedback);
-          if (submissionWithFeedback) {
-            setAiFeedback(submissionWithFeedback.ai_feedback);
-          }
-        }
-      })
-      .catch(console.error);
-  }, []);
+    if (!team) return;
+
+    const timer = setTimeout(() => {
+      saveProblemStatement();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [problemStatement]);
 
   return (
+
     <div className="bg-surface min-h-[calc(100vh-80px)] overflow-x-hidden">
       {/* Main Content Area */}
       <main className="max-w-[1280px] mx-auto p-6 lg:p-margin-desktop bg-gradient-to-br from-[#fef2e5] to-[#fff8f3]">
@@ -62,14 +167,14 @@ export default function TeamWorkspace() {
             <nav className="flex items-center gap-2 text-outline text-label-sm mb-4">
               <Link href="/participant/teams" className="hover:text-primary">Teams</Link>
               <span className="material-symbols-outlined text-xs">chevron_right</span>
-              <span className="text-primary font-bold">EcoStream</span>
+              <span className="text-primary font-bold">{team ? team.name : "Team Workspace"}</span>
             </nav>
-            <h2 className="font-display-lg text-[48px] text-on-surface mb-2">EcoStream</h2>
-            <p className="font-headline-sm text-[24px] text-on-surface-variant font-normal italic">"Real-time monitoring of urban water usage"</p>
+            <h2 className="font-display-lg text-[48px] text-on-surface mb-2">{team ? team.name : "Team Workspace"}</h2>
+
           </div>
           <div className="mt-6 md:mt-0 flex gap-3">
-    
-            
+
+
           </div>
         </div>
 
@@ -131,9 +236,12 @@ export default function TeamWorkspace() {
                 <span className="material-symbols-outlined text-outline cursor-pointer hover:text-primary transition-colors">edit_note</span>
               </div>
               <div className="bg-surface-bright p-6 rounded-2xl border border-surface-variant mb-8">
-                <p className="text-body-lg text-on-surface-variant">
-                  Developing an AI-driven IoT sensor network for high-resolution water consumption tracking. Our solution combines affordable ultrasonic flow sensors with a low-power LoRaWAN mesh to provide property managers with leak detection and usage analytics.
-                </p>
+                <textarea
+                  value={problemStatement}
+                  onChange={(e) => setProblemStatement(e.target.value)}
+                  placeholder="Describe your solution and problem statement..."
+                  className="w-full min-h-[180px] bg-transparent text-body-lg text-on-surface-variant outline-none resize-none"
+                />
               </div>
               <h4 className="font-label-md text-on-surface mb-4 uppercase tracking-widest">Milestones Journey</h4>
               <div className="space-y-4">
@@ -168,22 +276,22 @@ export default function TeamWorkspace() {
               </div>
             </section>
             <section className="bg-surface-container-lowest p-8 rounded-[24px] shadow-[0_20px_30px_-10px_rgba(214,203,191,0.4)] border border-outline-variant/30 transition-transform duration-300 hover:-translate-y-1">
-  <div className="mb-6">
-    <h3 className="font-headline-md text-[32px] text-on-surface mb-2">
-      Project Idea
-    </h3>
-    <p className="text-on-surface-variant text-body-md">
-      Briefly describe your solution, innovation, and expected impact.
-    </p>
-  </div>
+              <div className="mb-6">
+                <h3 className="font-headline-md text-[32px] text-on-surface mb-2">
+                  Project Idea
+                </h3>
+                <p className="text-on-surface-variant text-body-md">
+                  Briefly describe your solution, innovation, and expected impact.
+                </p>
+              </div>
 
-  <textarea
-    value={projectDescription}
-    onChange={(e) => setProjectDescription(e.target.value)}
-    placeholder="Describe your project idea, solution approach, innovation, and expected impact..."
-    className="w-full min-h-[220px] bg-[#fffaf6] border-2 border-primary/20 rounded-2xl p-6 text-body-md text-on-surface placeholder:text-outline outline-none resize-none shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
-  />
-</section>
+              <textarea
+                value={projectDescription}
+                onChange={(e) => setProjectDescription(e.target.value)}
+                placeholder="Describe your project idea, solution approach, innovation, and expected impact..."
+                className="w-full min-h-[220px] bg-[#fffaf6] border-2 border-primary/20 rounded-2xl p-6 text-body-md text-on-surface placeholder:text-outline outline-none resize-none shadow-sm focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+              />
+            </section>
             {/* Submission Section */}
             <section className="bg-surface-container-lowest p-8 rounded-[24px] shadow-[0_20px_30px_-10px_rgba(214,203,191,0.4)] border border-outline-variant/30 transition-transform duration-300 hover:-translate-y-1">
               <h3 className="font-headline-md text-[32px] text-on-surface mb-6">Submission Materials</h3>
@@ -192,26 +300,47 @@ export default function TeamWorkspace() {
                   <label className="font-label-md text-on-surface">GitHub Repository</label>
                   <div className="relative">
                     <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary">link</span>
-                    <input className="w-full bg-surface-bright border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary rounded-xl pl-12 py-3 text-body-md outline-none transition-all" type="url" defaultValue="https://github.com/ecostream/iot-mesh" />
+                    <input className="w-full bg-surface-bright border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary rounded-xl pl-12 py-3 text-body-md outline-none transition-all" type="url" value={githubUrl} onChange={(e) => setGithubUrl(e.target.value)} placeholder="https://github.com/..." />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <label className="font-label-md text-on-surface">Demo Video URL</label>
                   <div className="relative">
                     <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary">play_circle</span>
-                    <input className="w-full bg-surface-bright border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary rounded-xl pl-12 py-3 text-body-md outline-none transition-all" placeholder="https://vimeo.com/..." type="url" />
+                    <input className="w-full bg-surface-bright border border-outline-variant focus:border-primary focus:ring-1 focus:ring-primary rounded-xl pl-12 py-3 text-body-md outline-none transition-all" placeholder="https://vimeo.com/..." type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} />
                   </div>
                 </div>
               </div>
               <div className="mb-8">
                 <label className="font-label-md text-on-surface block mb-2">Presentation Deck</label>
-                <div className="border-2 border-dashed border-primary-container bg-primary-fixed/20 rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-primary-fixed/30 transition-colors">
-                  <span className="material-symbols-outlined text-4xl text-primary mb-2">upload_file</span>
-                  <p className="font-headline-sm text-[24px] text-primary mb-1">Upload your PDF or PPTX</p>
-                  <p className="text-label-sm text-on-surface-variant">Max file size 25MB. Final version required for judging.</p>
-                </div>
+                <label className="border-2 border-dashed border-primary-container bg-primary-fixed/20 rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-primary-fixed/30 transition-colors">
+                  <input
+                    type="file"
+                    accept=".pdf,.ppt,.pptx"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        setDeckFile(e.target.files[0]);
+                      }
+                    }}
+                  />
+
+                  <span className="material-symbols-outlined text-4xl text-primary mb-2">
+                    upload_file
+                  </span>
+
+                  <p className="font-headline-sm text-[24px] text-primary mb-1">
+                    {deckFile
+                      ? deckFile.name
+                      : "Upload your PDF or PPTX"}
+                  </p>
+
+                  <p className="text-label-sm text-on-surface-variant">
+                    Max file size 25MB
+                  </p>
+                </label>
               </div>
-              <button 
+              <button
                 onClick={handleSubmission}
                 disabled={isSubmitting}
                 className="w-full bg-primary text-on-primary py-5 rounded-2xl font-headline-sm text-[24px] shadow-lg hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
@@ -230,47 +359,21 @@ export default function TeamWorkspace() {
                 <h3 className="font-headline-sm text-[24px] text-on-surface">Team Members</h3>
               </div>
               <div className="space-y-6">
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <img className="w-12 h-12 rounded-full object-cover bg-surface-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDKTdeQq2BSzaRm5htmAXf-2mFq5sHNPUWhBoHlPtD-RM0iVTLLN1EsMzzzf_1b4RmKGOw3JbREWcQqNi8K0r4Qdf6d_i_T0GM_pgXsu2NguY2thB-qO37xbkWN6sU2N2OSM_QCdIhN-NvpYc6RyJyYojaYKD_Azjrmh1gxXELeA-Qzq1gySazjyMSx0I1EKloxr-NAFeqs8xzoFN0oLysiw3pOeTDf9GyOkgXr2CUlFhHyUGeqCoRzt_pj4Dw-ht1cc3AArCZxE2o" alt="Alex Rivera" />
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-label-md text-on-surface">Alex Rivera</p>
-                    <p className="text-[10px] text-outline uppercase tracking-wider">Team Lead</p>
-                    <div className="flex gap-1 mt-1">
-                      <span className="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] rounded-full">Python</span>
-                      <span className="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] rounded-full">IoT</span>
+                {members.map(member => (
+                  <div key={member.id} className="flex items-center gap-4">
+                    <div className="relative">
+                      <div className="w-12 h-12 rounded-full object-cover bg-primary-container flex items-center justify-center font-bold text-[20px] text-primary">
+                        {member.name ? member.name.charAt(0).toUpperCase() : "?"}
+                      </div>
+                      <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-label-md text-on-surface">{member.name || "Unknown Hacker"}</p>
+                      <p className="text-[10px] text-outline uppercase tracking-wider">Team Member</p>
+
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <img className="w-12 h-12 rounded-full object-cover bg-surface-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBMyYeWhVJK7uqXLt1qiQmJSOvjG2xWbjYQ64-MM9YOJN7YRrT4lYMhyc4MzQCdUeh3FVk718BR5Het8RAJA5jzt8c46jq8IBeVxu3okd624Z0J9536FsH-XtlZm0OPL2x4peY5Edry_Ar7f1UF76YCmWE7yhdySSbS_ef41QI4r3jDnL2gckka_x2y186TEawhTUjbUDl48jarNbKViS2lIfywZTTPXRmCa1uXnBZN5VOVpg4Rn3wX5IShR6l767_pX89h-FTa7jk" alt="Marcus Chen" />
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-label-md text-on-surface">Marcus Chen</p>
-                    <p className="text-[10px] text-outline uppercase tracking-wider">Fullstack Developer</p>
-                    <div className="flex gap-1 mt-1">
-                      <span className="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] rounded-full">React</span>
-                      <span className="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] rounded-full">Node</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="relative opacity-60">
-                    <img className="w-12 h-12 rounded-full object-cover grayscale bg-surface-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDmBt37nRD1uHQmDwbntqrDU34Ch72psZpsEi-SIWW7QhHuKog96rgvGse8wrLlTwJh4gzqrizw1kbMQcZ1c2Xw11tIkQNHrk1QmdUMbkNdQGMJRz1Ifktz6gUnmhw5RMnTyxkWAQwLj2Jocl6pLbAlI0QPZbAFkehKzufHpsNJ5I4wt5BcQIQj5ud7321NZJHCEmDiEOx6TdtmXFnejv6H60OjgQfzQ99iieF-mT6VGFd3Hlq3mv7wwKVf1ITQRXsIeaOvGDuog0M" alt="Sophie Laurent" />
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-outline border-2 border-white rounded-full"></span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-label-md text-on-surface">Sophie Laurent</p>
-                    <p className="text-[10px] text-outline uppercase tracking-wider">UI/UX Designer</p>
-                    <div className="flex gap-1 mt-1">
-                      <span className="px-2 py-0.5 bg-secondary-container text-on-secondary-container text-[10px] rounded-full">Figma</span>
-                    </div>
-                  </div>
-                </div>
+                ))}
               </div>
             </section>
 
@@ -340,7 +443,7 @@ export default function TeamWorkspace() {
                   <div className="z-10 w-8 h-8 rounded-full bg-tertiary flex items-center justify-center text-on-tertiary ring-4 ring-tertiary/20">
                     <span className="material-symbols-outlined text-sm">edit</span>
                   </div>
-                  
+
                   <div>
                     <p className="font-label-md text-tertiary font-bold">Submission</p>
                     <p className="text-[11px] text-tertiary-fixed-dim">Currently Active</p>

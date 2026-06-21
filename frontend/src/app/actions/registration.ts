@@ -207,7 +207,7 @@ export async function createDirectProfile(payload: SubmitRegistrationPayload) {
     status: 'approved'
   }
 
-  const { data: existingPart } = await supabase.from('participants').select('id').eq('id', user.id).single()
+  const { data: existingPart } = await supabase.from('participants').select('id').eq('user_id', user.id).single()
 
   if (existingPart) {
     const { error: partUpdateError } = await supabase.from('participants').update({
@@ -221,7 +221,7 @@ export async function createDirectProfile(payload: SubmitRegistrationPayload) {
       declared_skills: participantPayload.declared_skills,
       skill_vector: participantPayload.skill_vector,
       status: participantPayload.status
-    }).eq('id', user.id)
+    }).eq('user_id', user.id)
     if (partUpdateError) {
       console.error("Direct participant update failed:", partUpdateError);
       return { success: false, error: partUpdateError.message }

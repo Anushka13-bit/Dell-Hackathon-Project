@@ -43,6 +43,7 @@ export interface OnboardingState {
   resumeUploaded: boolean;
   onboardingComplete: boolean;
   aiData: OnboardingAiData | null;
+  registrationDecision: string | null;
 
   // Actions
   nextStep: () => void;
@@ -66,6 +67,7 @@ const initialState = {
   resumeUploaded: false,
   onboardingComplete: false,
   aiData: null,
+  registrationDecision: null,
 };
 
 export const useOnboardingStore = create<OnboardingState>()(

@@ -21,6 +21,9 @@ class SubmissionCreate(BaseModel):
     title: str
     description: Optional[str] = None
     idea_vector: Optional[dict] = None
+    github_url: Optional[str] = None
+    ppt_url: Optional[str] = None
+    video_url: Optional[str] = None
 
 
 class SubmissionOut(BaseModel):
@@ -31,6 +34,9 @@ class SubmissionOut(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     idea_vector: Optional[dict] = None
+    github_url: Optional[str] = None
+    ppt_url: Optional[str] = None
+    video_url: Optional[str] = None
 
     submitted_at: Optional[datetime] = None
 
@@ -53,6 +59,9 @@ async def create_submission(data: SubmissionCreate, db: Session = Depends(get_db
         title=data.title,
         description=data.description,
         idea_vector=data.idea_vector,
+        github_url=data.github_url,
+        ppt_url=data.ppt_url,
+        video_url=data.video_url,
         submitted_at=datetime.now(timezone.utc),
         status="submitted",
     )

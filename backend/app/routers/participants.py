@@ -117,6 +117,8 @@ async def get_participant(participant_id: str, db: Session = Depends(get_db)):
     """Get a single participant by ID."""
     p = db.query(Participant).filter(Participant.id == participant_id).first()
     if not p:
+        p = db.query(Participant).filter(Participant.user_id == participant_id).first()
+    if not p:
         raise HTTPException(status_code=404, detail="Participant not found")
     return p
 

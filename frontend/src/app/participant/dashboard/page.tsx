@@ -3,59 +3,17 @@
 import Link from "next/link";
 import { ArrowRight, Trophy, Code, Users, Sparkles, Calendar as CalendarIcon } from "lucide-react";
 import { useOnboardingStore } from "@/store/useOnboardingStore";
+import { useEffect, useState } from "react";
 
-const MOCK_HACKATHONS = [
-  {
-    id: "h1",
-    title: "GenAI Innovate 2024",
-    description: "Build the next generation of AI-native applications using LLMs and vector databases.",
-    targetSkills: { ai_ml: 1.0, backend: 0.6, cloud: 0.4 },
-    date: "Aug 15 - Aug 17",
-    prizePool: "₹5,00,000",
-    tagColor: "bg-purple-100 text-purple-700 border-purple-200",
-    theme: "purple"
-  },
-  {
-    id: "h2",
-    title: "FinTech Disrupt",
-    description: "Secure, scalable financial solutions for the modern economy.",
-    targetSkills: { backend: 0.8, cybersecurity: 0.8, data_engineering: 0.5 },
-    date: "Sep 01 - Sep 03",
-    prizePool: "₹2,50,000",
-    tagColor: "bg-blue-100 text-blue-700 border-blue-200",
-    theme: "blue"
-  },
-  {
-    id: "h3",
-    title: "Web3 Buildathon",
-    description: "Decentralized applications, smart contracts, and the future of the web.",
-    targetSkills: { frontend: 0.8, backend: 0.6, cybersecurity: 0.5 },
-    date: "Oct 12 - Oct 14",
-    prizePool: "₹1,00,000",
-    tagColor: "bg-orange-100 text-orange-700 border-orange-200",
-    theme: "orange"
-  },
-  {
-    id: "h4",
-    title: "Mobile Innovation Jam",
-    description: "Creating beautiful, high-performance mobile experiences.",
-    targetSkills: { mobile: 1.0, ui_ux: 0.8, frontend: 0.4 },
-    date: "Nov 05 - Nov 07",
-    prizePool: "₹3,00,000",
-    tagColor: "bg-pink-100 text-pink-700 border-pink-200",
-    theme: "pink"
-  },
-  {
-    id: "h5",
-    title: "IoT Hardware Hack",
-    description: "Connecting the physical and digital worlds through embedded systems.",
-    targetSkills: { hardware: 1.0, devops: 0.6, backend: 0.3 },
-    date: "Dec 01 - Dec 03",
-    prizePool: "₹1,50,000",
-    tagColor: "bg-teal-100 text-teal-700 border-teal-200",
-    theme: "teal"
-  }
-];
+type Hack = {
+  id: string;
+  name: string;
+  theme?: string | null;
+  description?: string | null;
+  event_start?: string | null;
+  event_end?: string | null;
+  targetSkills?: Record<string, number>;
+}
 
 function calculateMatch(participantVector: Record<string, number> | undefined, hackathonVector: Record<string, number>) {
   if (!participantVector) return 0;
@@ -77,11 +35,41 @@ export default function ParticipantDashboard() {
   const { fullName, aiData } = useOnboardingStore();
   const participantVector = aiData?.skill_vector;
 
+  // Fetch hackathons from backend
+  const [hackathons, setHackathons] = useState<Hack[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    setLoading(true);
+    fetch(`${apiUrl}/hackathons/`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`Status ${r.status}`);
+        return r.json();
+      })
+      .then((data) => {
+        // Map backend shape to frontend-friendly shape
+        const mapped = (data || []).map((h: any) => ({
+          id: h.id,
+          name: h.name,
+          theme: h.theme,
+          description: h.description,
+          event_start: h.event_start,
+          event_end: h.event_end,
+          targetSkills: h.target_skills || {},
+        }));
+        setHackathons(mapped);
+      })
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
+  }, []);
+
   // Calculate scores and sort
-  const sortedHackathons = [...MOCK_HACKATHONS].map(h => ({
+  const sortedHackathons = [...hackathons].map(h => ({
     ...h,
-    matchScore: calculateMatch(participantVector, h.targetSkills as unknown as Record<string, number>)
-  })).sort((a, b) => b.matchScore - a.matchScore);
+    matchScore: calculateMatch(participantVector, (h.targetSkills as unknown) as Record<string, number> || {})
+  })).sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
 
   const firstName = fullName ? fullName.split(" ")[0] : "Hacker";
 
@@ -159,7 +147,34 @@ export default function ParticipantDashboard() {
           </div>
 
           {/* AI Recommended Hackathons */}
-          
+          <div className="mb-8">
+            <h2 className="text-[20px] font-bold mb-4">AI Recommended Hackathons</h2>
+
+            {loading ? (
+              <div className="text-on-surface-variant">Loading hackathons...</div>
+            ) : error ? (
+              <div className="text-error">Failed to load hackathons: {error}</div>
+            ) : sortedHackathons.length === 0 ? (
+              <div className="text-on-surface-variant">No hackathons available.</div>
+            ) : (
+              <div className="space-y-4">
+                {sortedHackathons.slice(0, 4).map((hack: any) => (
+                  <div key={hack.id} className="bg-white p-4 rounded-2xl border border-outline-variant/20 flex items-start justify-between">
+                    <div>
+                      <div className="text-sm text-on-surface-variant mb-1">{hack.theme || 'General'}</div>
+                      <h4 className="font-bold text-[16px]">{hack.name || hack.title}</h4>
+                      <p className="text-on-surface-variant text-[13px] mt-1">{hack.description}</p>
+                    </div>
+                    <div className="text-right flex flex-col items-end justify-between">
+                      <div className="text-[12px] text-on-surface-variant">Match</div>
+                      <div className="font-bold text-[18px] text-primary">{hack.matchScore ?? 0}%</div>
+                      <Link href={`/participant/hackathons/${hack.id}`} className="text-[13px] text-primary mt-3">View →</Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div>
