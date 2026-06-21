@@ -24,13 +24,13 @@ class ParticipantCreate(BaseModel):
     team_id: Optional[str] = None
 
 class ParticipantOut(BaseModel):
-    id: str
+    id: uuid.UUID | str
     name: Optional[str] = None
     college_name: Optional[str] = None
     github_url: Optional[str] = None
     declared_skills: Optional[List[str]] = []
     skill_vector: Optional[dict] = None
-    team_id: Optional[str] = None
+    team_id: Optional[uuid.UUID | str] = None
 
     class Config:
         from_attributes = True
@@ -59,6 +59,14 @@ async def register_participant(
     db: Session = Depends(get_db)
 ):
     """Store a new participant registration. Resume skill parsing runs in background via Celery."""
+    import uuid
+    try:
+        # Check if the provided ID is a valid UUID
+        uuid.UUID(id)
+    except ValueError:
+        # If they entered a random number like "1" in Swagger, generate a real UUID
+        id = str(uuid.uuid4())
+
     existing = db.query(Participant).filter(Participant.id == id).first()
     if existing:
         raise HTTPException(status_code=409, detail="Participant already registered")
@@ -85,7 +93,6 @@ async def register_participant(
         college_name=college_name,
         github_url=github_url,
         team_id=None,
-        vectorization_status="pending",
     )
     db.add(participant)
     db.commit()
@@ -227,7 +234,11 @@ async def validate_facescan(request: FaceScanRequest, db: Session = Depends(get_
     if not reg:
         raise HTTPException(status_code=404, detail="Registration not found")
         
-    reg.face_scan_status = request.status
+    status_val = request.status
+    if status_val == "success":
+        status_val = "verified"
+        
+    reg.face_scan_status = status_val
     reg.face_scan_score = request.score
     reg.face_scan_consented = request.consented
     
@@ -249,7 +260,7 @@ async def chat_with_bot(request: ChatRequest, db: Session = Depends(get_db)):
     from app.services.ai.pipelines.chatbot.rag import ask_chatbot
     
     try:
-        response = ask_chatbot(request.question, request.hackathon_id, db)
+        response = await ask_chatbot(request.question, request.hackathon_id, db)
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

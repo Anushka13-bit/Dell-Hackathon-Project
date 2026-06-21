@@ -25,9 +25,12 @@ class TeamCreate(BaseModel):
 
 
 class TeamOut(BaseModel):
-    team_id: str
+    team_id: uuid.UUID | str
     name: Optional[str] = None
-    member_ids: Optional[List[str]] = []
+    member_ids: Optional[List[uuid.UUID | str]] = []
+    coverage_score: Optional[float] = None
+    diversity_score: Optional[float] = None
+    formation_confidence: Optional[float] = None
 
     class Config:
         from_attributes = True
@@ -53,9 +56,13 @@ async def create_team(data: TeamCreate, db: Session = Depends(get_db)):
 
     # Update participants with team_id
     for pid in (data.member_ids or []):
-        p = db.query(Participant).filter(Participant.id == pid).first()
+        p = db.query(Participant).filter(Participant.id == str(pid)).first()
         if p:
             p.team_id = team.team_id
+            
+    # Calculate baseline scores
+    _recalculate_team_metrics(db, team)
+            
     db.commit()
 
     try:
@@ -104,6 +111,9 @@ async def add_member(team_id: str, data: AddMemberRequest, db: Session = Depends
     p = db.query(Participant).filter(Participant.id == data.participant_id).first()
     if p:
         p.team_id = t.team_id
+        
+    # Calculate baseline scores
+    _recalculate_team_metrics(db, t)
 
     db.commit()
 
@@ -267,7 +277,7 @@ async def respond_to_invite(invite_id: str, data: InviteRespondRequest, db: Sess
             team_id=str(team.team_id),
             name=team.name,
             leader_id=str(team.member_ids[0]) if team.member_ids else None,
-            member_ids=list(team.member_ids),
+            member_ids=[str(m) for m in team.member_ids],
             slots_remaining=max(0, 4 - len(team.member_ids)),
             is_open=True,
             is_locked=False
@@ -296,9 +306,13 @@ async def respond_to_invite(invite_id: str, data: InviteRespondRequest, db: Sess
         invite.responded_at = datetime.now(timezone.utc)
         
         if updated_team_schema:
-            team.member_ids = updated_team_schema.member_ids
+            team.member_ids = [uuid.UUID(m) for m in updated_team_schema.member_ids]
+            
+            # Calculate baseline scores
+            _recalculate_team_metrics(db, team)
+            
             # Update the participant's team_id
-            p = db.query(Participant).filter(Participant.id == invite.participant_id).first()
+            p = db.query(Participant).filter(Participant.id == str(invite.participant_id)).first()
             if p:
                 p.team_id = team.team_id
                 
@@ -309,8 +323,11 @@ async def respond_to_invite(invite_id: str, data: InviteRespondRequest, db: Sess
 
 # --------------- AI team formation endpoint ---------------
 
+class TeamFormationRequest(BaseModel):
+    team_size: int = 4
+
 @router.post("/form")
-async def trigger_team_formation():
+async def trigger_team_formation(data: TeamFormationRequest):
     """Triggers coverage-driven team assembly as a background Celery task."""
     from app.tasks.team_tasks import team_formation_task
     task = team_formation_task.delay()
@@ -330,6 +347,6 @@ async def trigger_team_formation():
 
     return {
         "status": "formation_started",
-        "message": "Teams are being formed in the background.",
+        "message": f"Teams of size {data.team_size} are being formed in the background.",
         "task_id": task.id
     }

@@ -6,12 +6,12 @@ from app.models.problem_statement import ProblemStatement
 from app.models.team import Team
 
 @celery_app.task(name="team_formation_task")
-def team_formation_task():
+def team_formation_task(team_size: int = 4):
     """
-    Background task to form teams using AI coverage-driven optimization.
+    Background task to form generic diverse teams of a fixed size.
     """
     from app.services.ai.pipelines.team_formation.formation import form_teams
-    from app.services.ai.core.schemas import Participant as ParticipantSchema, PSRequirement, SkillVector
+    from app.services.ai.core.schemas import Participant as ParticipantSchema, SkillVector
 
     db = SessionLocal()
     try:
@@ -21,48 +21,42 @@ def team_formation_task():
             return {"status": "success", "message": "No unassigned participants found."}
 
         schema_participants = []
+        from app.services.ai.core.schemas import ParsedResume
         for p in db_participants:
+            # Safely parse skill vector, ignoring non-numeric values like 'processing'
+            raw_sv = p.skill_vector or {}
+            clean_sv = {}
+            if isinstance(raw_sv, dict):
+                for k, v in raw_sv.items():
+                    try:
+                        clean_sv[k] = float(v)
+                    except (ValueError, TypeError):
+                        pass
+
             schema_participants.append(
                 ParticipantSchema(
                     id=str(p.id),
-                    name=p.name or "Unknown",
-                    college_name=p.college_name or "Unknown",
-                    github_url=p.github_url or "",
-                    skills=p.declared_skills or [],
-                    skill_vector=SkillVector.from_dict(p.skill_vector or {})
+                    parsed_resume=ParsedResume(
+                        name=p.name or "Unknown",
+                        college_name=p.college_name or "Unknown",
+                        github_url=p.github_url or "",
+                        raw_skills=p.declared_skills or []
+                    ),
+                    skill_vector=SkillVector.from_dict(clean_sv)
                 )
             )
 
-        # 2. Fetch problem statements
-        db_ps = db.query(ProblemStatement).all()
-        if not db_ps:
-            return {"status": "success", "message": "No problem statements found."}
-            
-        schema_ps = []
-        for ps in db_ps:
-            schema_ps.append(
-                PSRequirement(
-                    ps_id=str(ps.ps_id),
-                    title=ps.title or "Untitled",
-                    raw_text=ps.raw_text or "",
-                    required_vector=SkillVector.from_dict(ps.required_vector or {}),
-                    team_size=ps.max_size or 4
-                )
-            )
-
-        # 3. Form teams
-        result = form_teams(schema_participants, schema_ps)
+        # 2. Form teams using the fixed size
+        result = form_teams(schema_participants, team_size=team_size)
         
         formed_teams = result.get("teams", [])
 
         # 4. Save teams to DB
         for t in formed_teams:
             team_id = uuid.uuid4()
-            member_ids = [m for m in getattr(t, "member_ids", [])] if not hasattr(t, "members") else [m.id for m in getattr(t, "members", [])]
-            if not member_ids and hasattr(t, "members"):
-                member_ids = [m.id for m in t.members]
-            elif not member_ids:
-                member_ids = t.member_ids
+            
+            # t is a Team schema object which has member_ids
+            member_ids = list(t.member_ids)
             
             new_team = Team(
                 team_id=team_id,
@@ -73,10 +67,11 @@ def team_formation_task():
                 formation_confidence=getattr(t, "formation_confidence", 0.0)
             )
             db.add(new_team)
+            db.flush() # Ensure team is inserted before updating participants
             
             # Update participants
             for p_id in member_ids:
-                db_p = db.query(Participant).filter(Participant.id == p_id).first()
+                db_p = db.query(Participant).filter(Participant.id == str(p_id)).first()
                 if db_p:
                     db_p.team_id = team_id
                     
