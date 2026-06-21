@@ -341,13 +341,16 @@ async def respond_to_invite(invite_id: str, data: InviteRespondRequest, db: Sess
 
 # --------------- AI team formation endpoint ---------------
 
+class TeamFormationRequest(BaseModel):
+    team_size: int = 4
+
 @router.post("/form")
-async def trigger_team_formation():
+async def trigger_team_formation(data: TeamFormationRequest):
     """Triggers coverage-driven team assembly as a background Celery task."""
     from app.tasks.team_tasks import team_formation_task
-    task = team_formation_task.delay()
+    task = team_formation_task.delay(team_size=data.team_size)
     return {
         "status": "formation_started",
-        "message": "Teams are being formed in the background.",
+        "message": f"Teams of size {data.team_size} are being formed in the background.",
         "task_id": task.id
     }

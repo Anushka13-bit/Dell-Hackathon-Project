@@ -6,12 +6,12 @@ from app.models.problem_statement import ProblemStatement
 from app.models.team import Team
 
 @celery_app.task(name="team_formation_task")
-def team_formation_task():
+def team_formation_task(team_size: int = 4):
     """
-    Background task to form teams using AI coverage-driven optimization.
+    Background task to form generic diverse teams of a fixed size.
     """
     from app.services.ai.pipelines.team_formation.formation import form_teams
-    from app.services.ai.core.schemas import Participant as ParticipantSchema, PSRequirement, SkillVector
+    from app.services.ai.core.schemas import Participant as ParticipantSchema, SkillVector
 
     db = SessionLocal()
     try:
@@ -46,25 +46,8 @@ def team_formation_task():
                 )
             )
 
-        # 2. Fetch problem statements
-        db_ps = db.query(ProblemStatement).all()
-        if not db_ps:
-            return {"status": "success", "message": "No problem statements found."}
-            
-        schema_ps = []
-        for ps in db_ps:
-            schema_ps.append(
-                PSRequirement(
-                    ps_id=str(ps.ps_id),
-                    title=ps.title or "Untitled",
-                    raw_text=ps.raw_text or "",
-                    required_vector=SkillVector.from_dict(ps.required_vector or {}),
-                    team_size=ps.max_size or 4
-                )
-            )
-
-        # 3. Form teams
-        result = form_teams(schema_participants, schema_ps)
+        # 2. Form teams using the fixed size
+        result = form_teams(schema_participants, team_size=team_size)
         
         formed_teams = result.get("teams", [])
 

@@ -125,10 +125,10 @@ def diversity_score(members: list[Participant]) -> float:
     return (college_entropy + skill_entropy) / 4.0
 
 
-def form_teams(unassigned: list[Participant], requirements: list[PSRequirement]) -> dict:
-    """Coverage-Driven Team Assembly (PRD 10.5 & 10.6).
+def form_teams(unassigned: list[Participant], team_size: int = 4) -> dict:
+    """Coverage-Driven Team Assembly for generic teams.
     
-    Includes Stage 1-3 (Coverage Greedy), Stage 4 (Diversity), and Stage 5 (Local Optimization).
+    Includes Stage 1-3 (Coverage Greedy against baseline), Stage 4 (Diversity), and Stage 5 (Local Optimization).
     """
     pool: list[Participant] = list(unassigned)
     all_by_id = {p.id: p for p in pool}
@@ -139,15 +139,19 @@ def form_teams(unassigned: list[Participant], requirements: list[PSRequirement])
     team_reqs: dict[str, SkillVector] = {}
     team_members: dict[str, list[Participant]] = {}
 
-    for req in requirements:
+    num_teams = math.ceil(len(pool) / team_size) if pool else 0
+    ideal_scores = {cat: 1.0 for cat in category_names()}
+    ideal_vec = SkillVector(scores=ideal_scores)
+
+    for i in range(num_teams):
         team = Team(
             team_id=str(uuid.uuid4()),
-            name=f"Team {req.title}",
+            name=f"Team {i+1}",
             member_ids=[],
-            slots_remaining=req.team_size,
+            slots_remaining=team_size,
         )
         teams.append(team)
-        team_reqs[team.team_id] = req.required_vector
+        team_reqs[team.team_id] = ideal_vec
         team_members[team.team_id] = []
 
         # Stage 2 & 3: Coverage-Driven Candidate Scoring
@@ -157,7 +161,7 @@ def form_teams(unassigned: list[Participant], requirements: list[PSRequirement])
             best_delta = float("-inf")
             
             for candidate in pool:
-                delta = _improvement(team_members[team.team_id], candidate, req.required_vector)
+                delta = _improvement(team_members[team.team_id], candidate, ideal_vec)
                 if delta > best_delta + 0.01:
                     best_delta = delta
                     best_candidates = [candidate]
@@ -182,7 +186,7 @@ def form_teams(unassigned: list[Participant], requirements: list[PSRequirement])
                 pass # Still assign if we have slots to fill
                 
             pool.remove(pick)
-            _assign(team, pick, team_members[team.team_id], req.required_vector, log)
+            _assign(team, pick, team_members[team.team_id], ideal_vec, log)
 
     # Second pass: place leftovers on whichever open team they help most
     if pool:
