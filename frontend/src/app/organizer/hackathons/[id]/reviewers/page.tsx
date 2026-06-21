@@ -1,245 +1,577 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
 
-export default function HackathonReviewers() {
+import { useState, useEffect } from "react";
+
+const hackathons = [
+  {
+    id: "1",
+    title: "Global AI Hackathon",
+    endDate: "2026-07-15",
+  },
+  {
+    id: "2",
+    title: "Winter Tech Bloom",
+    endDate: "2026-06-28",
+  },
+  {
+    id: "3",
+    title: "Future Innovators",
+    endDate: "2026-06-20",
+  },
+]; //Need to be replaced with api call from backend
+
+const today = new Date();
+
+const validHackathons = hackathons.filter((hackathon) => {
+  return new Date(hackathon.endDate) >= today;
+});
+
+
+export default function OrganizerReviewers() {
+
+  const [showAssignReviewerModal, setShowAssignReviewerModal] = useState(false);
   const [reviewers, setReviewers] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
-  const [isAssigning, setIsAssigning] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [alerts, setAlerts] = useState<any[]>([]);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const [resRev, resAss] = await Promise.all([
-        fetch(`${apiUrl}/reviewers/`),
-        fetch(`${apiUrl}/assignments/`)
-      ]);
-      if (resRev.ok) setReviewers(await resRev.json());
-      if (resAss.ok) setAssignments(await resAss.json());
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [reviewerForm, setReviewerForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    resume: null as File | null,
+    hackathonId: "",
+  });
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const [dragActive, setDragActive] = useState(false);
 
-  const handleRunAssignment = async () => {
-    setIsAssigning(true);
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      await fetch(`${apiUrl}/assignments/generate`, { method: "POST" });
-      setTimeout(async () => {
-        await fetchData();
-        setIsAssigning(false);
-      }, 4000);
-    } catch (e) {
-      console.error(e);
-      setIsAssigning(false);
+  const handleFileDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragActive(false);
+
+    if (e.dataTransfer.files?.[0]) {
+      setReviewerForm({
+        ...reviewerForm,
+        resume: e.dataTransfer.files[0],
+      });
     }
   };
 
+  const handleFileSelect = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    if (e.target.files?.[0]) {
+      setReviewerForm({
+        ...reviewerForm,
+        resume: e.target.files[0],
+      });
+    }
+  };
+
+  const handleAssignReviewer = () => {
+    if (
+      !reviewerForm.name ||
+      !reviewerForm.email ||
+      !reviewerForm.phone ||
+      !reviewerForm.resume ||
+      !reviewerForm.hackathonId
+    ) {
+      alert("Please fill all fields");
+      return;
+    }
+
+    const selectedHackathon =
+      validHackathons.find(
+        h => h.id === reviewerForm.hackathonId
+      );
+
+    if (!selectedHackathon) {
+      alert("Invalid hackathon selected");
+      return;
+    }
+
+    console.log(reviewerForm);
+
+    setShowAssignReviewerModal(false);
+    setReviewerForm({ name: "", email: "", phone: "", resume: null, hackathonId: "" });
+  };
+
+  useEffect(() => {
+  const apiUrl =
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  Promise.all([
+  fetch(`${apiUrl}/reviewers/`).then((r) => r.json()),
+  fetch(`${apiUrl}/assignments/`).then((r) => r.json()),
+  fetch(`${apiUrl}/fairness/alerts`).then((r) => r.json()),
+])
+    .then(([reviewersData, assignmentsData, alertsData]) => {
+      setReviewers(reviewersData || []);
+      setAssignments(assignmentsData || []);
+      setAlerts(alertsData || []);
+    })
+    .catch(console.error)
+    .finally(() => setLoading(false));
+}, []);
+
+  useEffect(() => {
+    // Subtle entry animations
+    const cards = document.querySelectorAll('.metric-card-hover, .bg-white');
+    cards.forEach((card, index) => {
+      (card as HTMLElement).style.opacity = '0';
+      (card as HTMLElement).style.transform = 'translateY(10px)';
+      setTimeout(() => {
+        (card as HTMLElement).style.transition = 'all 0.6s cubic-bezier(0.23, 1, 0.32, 1)';
+        (card as HTMLElement).style.opacity = '1';
+        (card as HTMLElement).style.transform = 'translateY(0)';
+      }, 100 * index);
+    });
+  }, []);
+
+  const reviewerRows = reviewers.map((reviewer) => {
+  const reviewerAssignments = assignments.filter(
+    (a) => a.reviewer_id === reviewer.reviewer_id
+  );
+
+  return {
+    ...reviewer,
+    assignedTeams: reviewerAssignments.length,
+  };
+});
+
+const topReviewers = [...reviewerRows]
+  .sort((a, b) => (b.current_load ?? 0) - (a.current_load ?? 0))
+  .slice(0, 3);
+
+const overloadedReviewers = reviewers.filter(
+  (r) => (r.current_load ?? 0) >= 4
+);
+
+const avgLoad =
+  reviewers.length > 0
+    ? (
+        reviewers.reduce(
+          (sum, r) => sum + (r.current_load ?? 0),
+          0
+        ) / reviewers.length
+      ).toFixed(1)
+    : "0";
+
+if (loading) {
   return (
-    <div className="px-8 py-10 max-w-[1280px] mx-auto min-h-screen">
-      {/* Metrics Section */}
-      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-12">
-        <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 hover:-translate-y-1 transition-transform">
-          <p className="text-on-surface-variant text-[12px] font-bold uppercase mb-2">Total Reviewers</p>
-          <div className="flex items-end justify-between">
-            <h3 className="font-headline-md text-[32px] font-bold leading-none">{reviewers.length}</h3>
-            <span className="text-primary font-bold text-[12px]">+4</span>
-          </div>
-        </div>
-        <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 hover:-translate-y-1 transition-transform">
-          <p className="text-on-surface-variant text-[12px] font-bold uppercase mb-2">Active</p>
-          <div className="flex items-end justify-between">
-            <h3 className="font-headline-md text-[32px] font-bold leading-none">{reviewers.length > 0 ? reviewers.length - 1 : 0}</h3>
-            <div className="w-1.5 h-1.5 rounded-full bg-green-500 mb-2"></div>
-          </div>
-        </div>
-        <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 hover:-translate-y-1 transition-transform">
-          <p className="text-on-surface-variant text-[12px] font-bold uppercase mb-2">Assigned</p>
-          <div className="flex items-end justify-between">
-            <h3 className="font-headline-md text-[32px] font-bold leading-none">{assignments.length}</h3>
-            <span className="material-symbols-outlined text-outline">assignment</span>
-          </div>
-        </div>
-        <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 hover:-translate-y-1 transition-transform">
-          <p className="text-on-surface-variant text-[12px] font-bold uppercase mb-2">Pending</p>
-          <div className="flex items-end justify-between">
-            <h3 className="font-headline-md text-[32px] font-bold leading-none">0</h3>
-            <div className="px-1.5 py-0.5 bg-secondary-container text-on-secondary-container rounded text-[10px] mb-1 font-bold">CLEAR</div>
-          </div>
-        </div>
-        <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 hover:-translate-y-1 transition-transform border-error/20">
-          <p className="text-error text-[12px] font-bold uppercase mb-2">Risk Alerts</p>
-          <div className="flex items-end justify-between">
-            <h3 className="font-headline-md text-[32px] font-bold leading-none text-error">3</h3>
-            <span className="material-symbols-outlined text-error">warning</span>
-          </div>
-        </div>
-        <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 hover:-translate-y-1 transition-transform">
-          <p className="text-on-surface-variant text-[12px] font-bold uppercase mb-2">Avg Time</p>
-          <div className="flex items-end justify-between">
-            <h3 className="font-headline-md text-[32px] font-bold leading-none">1.2<span className="text-[12px] ml-1 opacity-50">d</span></h3>
-            <span className="material-symbols-outlined text-outline">speed</span>
-          </div>
-        </div>
-      </section>
+    <div className="p-8">
+      Loading reviewers...
+    </div>
+  );
+}
 
-
-      {/* Main Workspace: Table & Sidebar */}
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Table Section */}
-        <div className="w-full">
-          <div className="bg-white rounded-xl shadow-sm border border-outline-variant/20 overflow-hidden">
-            <div className="px-8 py-6 border-b border-outline-variant/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <h3 className="font-headline-sm text-[20px] font-bold">Reviewer Management</h3>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleRunAssignment}
-                  disabled={isAssigning}
-                  className="px-4 py-2 bg-secondary text-white rounded-lg text-[14px] font-medium flex items-center gap-2 hover:bg-secondary/90 transition-all disabled:opacity-50"
-                >
-                  <span className={`material-symbols-outlined text-[20px] ${isAssigning ? 'animate-spin' : ''}`}>
-                    {isAssigning ? 'sync' : 'auto_awesome'}
-                  </span>
-                  {isAssigning ? 'Optimizing...' : 'Run Optimizer'}
-                </button> 
-                <button
-                  className="px-4 py-2 bg-primary text-white rounded-lg text-[14px] font-medium flex items-center gap-2 hover:bg-primary/90 transition-all"
-                >
-                  <span className="material-symbols-outlined text-[20px]">
-                    person_add
-                  </span>
-                  Add Reviewer
-                </button> 
-                <button className="px-4 py-2 border border-outline-variant/50 rounded-lg text-[14px] font-medium flex items-center gap-2 hover:bg-surface-container-low transition-all">
-                  <span className="material-symbols-outlined text-[20px]">filter_list</span> Filter
-                </button>
-                <button className="px-4 py-2 border border-outline-variant/50 rounded-lg text-[14px] font-medium flex items-center gap-2 hover:bg-surface-container-low transition-all">
-                  <span className="material-symbols-outlined text-[20px]">download</span> Export CSV
-                </button>
-              </div>
+  return (
+    <div>
+      <div className="p-8 max-w-[1600px] mx-auto min-h-screen">
+        <style jsx>{`
+          .metric-card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          }
+          .metric-card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px -10px rgba(122, 86, 78, 0.08);
+          }
+        `}</style>
+        
+        {/* Metrics Section */}
+        <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-12">
+          <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 metric-card-hover">
+            <p className="text-on-surface-variant font-label-sm uppercase mb-2 text-[12px]">Total Reviewers</p>
+            <div className="flex items-end justify-between">
+              <h3 className="font-headline-md text-[32px] leading-none">
+  {reviewers.length}
+</h3>
+              <span className="text-primary font-bold text-[12px]">+4</span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left min-w-[800px]">
-                <thead className="bg-surface-container-low/50 text-outline uppercase text-[11px] font-bold tracking-widest border-b border-outline-variant/20">
-                  <tr>
-                    <th className="px-8 py-4">Reviewer</th>
-                    <th className="px-4 py-4">Expertise</th>
-                    <th className="px-4 py-4 text-center">Assigned Teams</th>
-                    <th className="px-4 py-4 text-center">Done</th>
-                    <th className="px-4 py-4 text-center">Avg. Score</th>
-                    <th className="px-4 py-4 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-outline-variant/10">
-                  {loading ? (
+          </div>
+          <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 metric-card-hover">
+            <p className="text-on-surface-variant font-label-sm uppercase mb-2 text-[12px]">Active</p>
+            <div className="flex items-end justify-between">
+              <h3 className="font-headline-md text-[32px] leading-none">
+  {reviewers.filter(r => (r.current_load ?? 0) > 0).length}
+</h3>
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500 mb-2"></div>
+            </div>
+          </div>
+          <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 metric-card-hover">
+            <p className="text-on-surface-variant font-label-sm uppercase mb-2 text-[12px]">Assigned</p>
+            <div className="flex items-end justify-between">
+              <h3 className="font-headline-md text-[32px] leading-none">
+  {assignments.length}
+</h3>
+              <span className="material-symbols-outlined text-outline">assignment</span>
+            </div>
+          </div>
+          <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 metric-card-hover">
+            <p className="text-on-surface-variant font-label-sm uppercase mb-2 text-[12px]">Pending</p>
+            <div className="flex items-end justify-between">
+              <h3 className="font-headline-md text-[32px] leading-none">
+  0
+</h3>
+              <div className="px-1.5 py-0.5 bg-secondary-container text-on-secondary-container rounded text-[10px] mb-1 font-bold">URGENT</div>
+            </div>
+          </div>
+          <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 metric-card-hover border-error/20">
+            <p className="text-error font-label-sm uppercase mb-2 text-[12px]">Risk Alerts</p>
+            <div className="flex items-end justify-between">
+              <h3 className="font-headline-md text-[32px] leading-none text-error">
+                {alerts.length}
+              </h3>
+              <span className="material-symbols-outlined text-error">warning</span>
+            </div>
+          </div>
+          <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 metric-card-hover">
+            <p className="text-on-surface-variant font-label-sm uppercase mb-2 text-[12px]">
+              Avg Load
+            </p>
+            <div className="flex items-end justify-between">
+              <h3 className="font-headline-md text-[32px] leading-none">
+              {avgLoad}
+            </h3>
+<span className="material-symbols-outlined text-outline">speed</span>
+            </div>
+          </div>
+        </section>
+
+        {/* Main Workspace: Table & Sidebar */}
+        <div className="flex flex-col xl:flex-row gap-6">
+          {/* Table Section */}
+          <div className="flex-1 min-w-0">
+            <div className="bg-white rounded-xl shadow-sm border border-outline-variant/20 overflow-hidden">
+              <div className="px-8 py-6 border-b border-outline-variant/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <h3 className="font-headline-sm text-[20px]">Reviewer Management</h3>
+                <button
+                onClick={() => setShowAssignReviewerModal(true)}
+                className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:opacity-90 transition"
+              >
+                + Assign Reviewer
+              </button>
+                <div className="flex items-center gap-3">
+                  <button className="px-4 py-2 border border-outline-variant/50 rounded-lg text-[14px] flex items-center gap-2 hover:bg-surface-container-low transition-all">
+                    <span className="material-symbols-outlined text-[20px]">filter_list</span> Filter
+                  </button>
+                  <button className="px-4 py-2 border border-outline-variant/50 rounded-lg text-[14px] flex items-center gap-2 hover:bg-surface-container-low transition-all">
+                    <span className="material-symbols-outlined text-[20px]">download</span> Export CSV
+                  </button>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-surface-container-low/50 text-outline uppercase font-label-sm text-[11px] tracking-widest">
                     <tr>
-                      <td colSpan={6} className="text-center py-10">Loading reviewers...</td>
+                      <th className="px-8 py-4">Reviewer</th>
+                      <th className="px-4 py-4">Expertise</th>
+                      <th className="px-4 py-4 text-center">Assigned Teams</th>
+                      <th className="px-4 py-4 text-center">Done</th>
+                      <th className="px-4 py-4 text-center">Avg. Score</th>
+                      <th className="px-4 py-4">Workload</th>
+                      <th className="px-8 py-4 text-right">Actions</th>
                     </tr>
-                  ) : reviewers.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="text-center py-10 text-outline">No reviewers found</td>
-                    </tr>
-                  ) : (
-                    reviewers.map((reviewer) => {
-                      const reviewerAssignments = assignments.filter((a) => a.reviewer_id === reviewer.reviewer_id);
+                  </thead>
+                 <tbody className="divide-y divide-outline-variant/10">
+                    {reviewerRows.map((reviewer) => {
+                      const load = reviewer.current_load ?? 0;
+
                       return (
-                        <tr key={reviewer.reviewer_id} className="hover:bg-surface-container-lowest/50 transition-colors group">
+                        <tr
+                          key={reviewer.reviewer_id}
+                          className="hover:bg-surface-container-lowest/50 transition-colors group"
+                        >
                           <td className="px-8 py-5">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-sm">
-                                {reviewer.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
-                              </div>
-                              <div>
-                                <p className="font-bold text-[14px]">{reviewer.name}</p>
-                                <p className="text-[11px] text-outline font-medium">ID: {reviewer.reviewer_id.split('-')[0]}</p>
-                              </div>
+                            <div>
+                              <p className="font-bold text-[14px]">
+                                {reviewer.name}
+                              </p>
+                              <p className="text-[11px] text-outline">
+                                Reviewer
+                              </p>
                             </div>
                           </td>
+
                           <td className="px-4 py-5">
                             <span className="px-2 py-0.5 bg-surface-container text-on-surface-variant rounded text-[10px] font-bold">
                               {reviewer.primary_specialization || "General"}
                             </span>
                           </td>
-                          <td className="px-4 py-5 text-center font-bold">{reviewerAssignments.length}</td>
-                          <td className="px-4 py-5 text-center text-primary font-bold">0</td>
-                          <td className="px-4 py-5 text-center font-bold">-</td>
-                          <td className="px-8 py-5 text-center ">
-                            <button className="text-primary hover:text-primary/70 font-bold text-[12px] flex items-center gap-1 inline-flex"><span className="material-symbols-outlined text-[16px]">visibility</span>Teams</button>
+
+                          <td className="px-4 py-5 text-center font-medium">
+                            {reviewer.assignedTeams}
+                          </td>
+
+                          <td className="px-4 py-5 text-center text-primary font-bold">
+                            {load}
+                          </td>
+
+                          <td className="px-4 py-5 text-center font-bold">
+                            -
+                          </td>
+
+                          <td className="px-4 py-5">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-[10px] font-bold">
+                              ACTIVE
+                            </span>
+                          </td>
+
+                          <td className="px-8 py-5 text-right">
+                            <button className="text-primary hover:text-primary/70 font-bold text-[12px]">
+                              View
+                            </button>
                           </td>
                         </tr>
                       );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <div className="px-8 py-4 bg-surface-container-low/30 border-t border-outline-variant/20 flex items-center justify-between">
-              <p className="text-[12px] text-on-surface-variant font-medium">Showing 3 of 42 reviewers</p>
-              <div className="flex items-center gap-2">
-                <button className="p-1.5 rounded border border-outline-variant/30 hover:bg-white text-outline transition-all disabled:opacity-30 flex items-center justify-center" disabled>
-                  <span className="material-symbols-outlined text-[18px]">chevron_left</span>
-                </button>
-                <span className="text-[12px] font-bold px-2">Page 1 of 14</span>
-                <button className="p-1.5 rounded border border-outline-variant/30 hover:bg-white text-on-surface transition-all flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-                </button>
+                    })}
+                  </tbody>
+                </table>
               </div>
+              <div className="px-8 py-4 bg-surface-container-low/30 border-t border-outline-variant/20 flex items-center justify-between">
+                <p className="text-[12px] text-on-surface-variant">Showing {reviewers.length} reviewers</p>
+                <div className="flex items-center gap-2">
+                  <button className="p-1.5 rounded border border-outline-variant/30 hover:bg-white text-outline transition-all disabled:opacity-30" disabled>
+                    <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                  </button>
+                  <span className="text-[12px] font-bold px-2">Page 1 of 14</span>
+                  <button className="p-1.5 rounded border border-outline-variant/30 hover:bg-white text-on-surface transition-all">
+                    <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Sidebar Insights Panel */}
+          <aside className="w-full xl:w-80 flex flex-col gap-6">
+            {/* Risk Analysis */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-outline-variant/20">
+              <h4 className="font-headline-sm text-[18px] mb-6 flex items-center gap-2">
+                <span className="material-symbols-outlined text-error">analytics</span> Risk Analysis
+              </h4>
+              <div className="mb-8">
+                <p className="text-[12px] font-bold text-on-surface-variant mb-4 uppercase tracking-tighter">Score Distribution</p>
+                <div className="flex items-end gap-1 h-24 mb-2 px-2">
+                  <div className="flex-1 bg-primary/10 rounded-t-sm h-[30%]"></div>
+                  <div className="flex-1 bg-primary/20 rounded-t-sm h-[45%]"></div>
+                  <div className="flex-1 bg-primary/40 rounded-t-sm h-[80%]"></div>
+                  <div className="flex-1 bg-primary/100 rounded-t-sm h-[100%]"></div>
+                  <div className="flex-1 bg-primary/60 rounded-t-sm h-[65%]"></div>
+                  <div className="flex-1 bg-primary/30 rounded-t-sm h-[40%]"></div>
+                </div>
+                <div className="flex justify-between text-[10px] text-outline font-bold">
+                  <span>POOR</span>
+                  <span>AVERAGE</span>
+                  <span>ELITE</span>
+                </div>
+              </div>
+              <div className="space-y-4">
+  <p className="text-[12px] font-bold text-on-surface-variant uppercase tracking-tighter">
+    Bias Indicators
+  </p>
+
+          {alerts.length === 0 ? (
+            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-green-600 text-[18px]">
+                  check_circle
+                </span>
+                <span className="text-[12px] font-medium text-green-700">
+                  No active fairness alerts
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 bg-error-container/20 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-error text-[18px]">
+                    warning
+                  </span>
+                  <span className="text-[12px] font-medium">
+                    Active Fairness Alerts
+                  </span>
+                </div>
+
+                <span className="text-[12px] font-bold text-error">
+                  {alerts.length}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      {/* Assign Reviewer Modal */}
+      {showAssignReviewerModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowAssignReviewerModal(false);
+              setReviewerForm({ name: "", email: "", phone: "", resume: null, hackathonId: "" });
+            }
+          }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-8 py-6 border-b border-outline-variant/20 flex items-center justify-between">
+              <div>
+                <h2 className="font-headline-sm text-[20px]">Assign Reviewer</h2>
+                <p className="text-on-surface-variant text-[13px] mt-0.5">Add a new reviewer and assign them to a hackathon</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAssignReviewerModal(false);
+                  setReviewerForm({ name: "", email: "", phone: "", resume: null, hackathonId: "" });
+                }}
+                className="p-2 rounded-full hover:bg-surface-container-low transition-colors text-outline hover:text-on-surface"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="px-8 py-6 space-y-5">
+              {/* Name */}
+              <div>
+                <label className="block text-[12px] font-bold text-on-surface-variant uppercase tracking-wide mb-1.5">
+                  Full Name <span className="text-error">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={reviewerForm.name}
+                  onChange={(e) => setReviewerForm({ ...reviewerForm, name: e.target.value })}
+                  placeholder="e.g. Dr. Jane Smith"
+                  className="w-full px-4 py-2.5 rounded-lg border border-outline-variant/50 text-[14px] bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                />
+              </div>
+
+              {/* Email & Phone row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[12px] font-bold text-on-surface-variant uppercase tracking-wide mb-1.5">
+                    Email <span className="text-error">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={reviewerForm.email}
+                    onChange={(e) => setReviewerForm({ ...reviewerForm, email: e.target.value })}
+                    placeholder="reviewer@email.com"
+                    className="w-full px-4 py-2.5 rounded-lg border border-outline-variant/50 text-[14px] bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-bold text-on-surface-variant uppercase tracking-wide mb-1.5">
+                    Phone <span className="text-error">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={reviewerForm.phone}
+                    onChange={(e) => setReviewerForm({ ...reviewerForm, phone: e.target.value })}
+                    placeholder="+1 (555) 000-0000"
+                    className="w-full px-4 py-2.5 rounded-lg border border-outline-variant/50 text-[14px] bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Resume Upload */}
+              <div>
+                <label className="block text-[12px] font-bold text-on-surface-variant uppercase tracking-wide mb-1.5">
+                  Resume <span className="text-error">*</span>
+                </label>
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                  onDragLeave={() => setDragActive(false)}
+                  onDrop={handleFileDrop}
+                  className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
+                    dragActive
+                      ? "border-primary bg-primary/5"
+                      : reviewerForm.resume
+                      ? "border-green-400 bg-green-50"
+                      : "border-outline-variant/50 hover:border-primary/50 hover:bg-surface-container-lowest"
+                  }`}
+                  onClick={() => document.getElementById("resume-upload")?.click()}
+                >
+                  <input
+                    id="resume-upload"
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    className="hidden"
+                    onChange={handleFileSelect}
+                  />
+                  {reviewerForm.resume ? (
+                    <div className="flex items-center justify-center gap-3">
+                      <span className="material-symbols-outlined text-green-600 text-[28px]">task</span>
+                      <div className="text-left">
+                        <p className="text-[13px] font-bold text-green-700">{reviewerForm.resume.name}</p>
+                        <p className="text-[11px] text-green-600">{(reviewerForm.resume.size / 1024).toFixed(1)} KB — click to replace</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <span className="material-symbols-outlined text-outline text-[36px] mb-2 block">upload_file</span>
+                      <p className="text-[13px] font-medium text-on-surface-variant">
+                        {dragActive ? "Drop file here" : "Drag & drop resume here"}
+                      </p>
+                      <p className="text-[11px] text-outline mt-1">or click to browse — PDF, DOC, DOCX</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Hackathon Dropdown */}
+              <div>
+                <label className="block text-[12px] font-bold text-on-surface-variant uppercase tracking-wide mb-1.5">
+                  Hackathon <span className="text-error">*</span>
+                </label>
+                {validHackathons.length === 0 ? (
+                  <div className="w-full px-4 py-2.5 rounded-lg border border-outline-variant/30 text-[13px] text-outline bg-surface-container-low">
+                    No active hackathons available
+                  </div>
+                ) : (
+                  <select
+                    value={reviewerForm.hackathonId}
+                    onChange={(e) => setReviewerForm({ ...reviewerForm, hackathonId: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-outline-variant/50 text-[14px] bg-surface-container-lowest focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="">Select a hackathon...</option>
+                    {validHackathons.map((h) => (
+                      <option key={h.id} value={h.id}>
+                        {h.title} — ends {new Date(h.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-8 py-5 bg-surface-container-low/40 border-t border-outline-variant/20 flex items-center justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowAssignReviewerModal(false);
+                  setReviewerForm({ name: "", email: "", phone: "", resume: null, hackathonId: "" });
+                }}
+                className="px-5 py-2.5 rounded-lg border border-outline-variant/50 text-[14px] font-medium hover:bg-surface-container-low transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAssignReviewer}
+                className="px-5 py-2.5 rounded-lg bg-primary text-white text-[14px] font-bold hover:opacity-90 transition-all flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[18px]">person_add</span>
+                Assign Reviewer
+              </button>
             </div>
           </div>
         </div>
-
-        {/* Sidebar Insights Panel */}
-        <aside className="w-full lg:w-80 flex flex-col gap-6">
-          {/* Risk Analysis */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-outline-variant/20">
-            <h4 className="font-headline-sm text-[18px] font-bold mb-6 flex items-center gap-2">
-              <span className="material-symbols-outlined text-error">analytics</span> Risk Analysis
-            </h4>
-            <div className="mb-8">
-              <p className="text-[12px] font-bold text-on-surface-variant mb-4 uppercase tracking-tighter">Score Distribution</p>
-              <div className="flex items-end gap-1 h-24 mb-2 px-2">
-                <div className="flex-1 bg-primary/10 rounded-t-sm h-[30%]"></div>
-                <div className="flex-1 bg-primary/20 rounded-t-sm h-[45%]"></div>
-                <div className="flex-1 bg-primary/40 rounded-t-sm h-[80%]"></div>
-                <div className="flex-1 bg-primary/100 rounded-t-sm h-[100%]"></div>
-                <div className="flex-1 bg-primary/60 rounded-t-sm h-[65%]"></div>
-                <div className="flex-1 bg-primary/30 rounded-t-sm h-[40%]"></div>
-              </div>
-              <div className="flex justify-between text-[10px] text-outline font-bold">
-                <span>POOR</span>
-                <span>AVERAGE</span>
-                <span>ELITE</span>
-              </div>
-            </div>
-            <div className="space-y-4">
-              <p className="text-[12px] font-bold text-on-surface-variant uppercase tracking-tighter">Bias Indicators</p>
-              <div className="flex items-center justify-between p-3 bg-error-container/20 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-error text-[18px]">trending_up</span>
-                  <span className="text-[12px] font-bold">Lenient Grading</span>
-                </div>
-                <span className="text-[12px] font-bold text-error">8% inc.</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-surface-container-low rounded-lg">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary text-[18px]">diversity_1</span>
-                  <span className="text-[12px] font-bold">Domain Favoritism</span>
-                </div>
-                <span className="text-[12px] font-bold text-primary">Stable</span>
-              </div>
-            </div>
-          </div>
-          {/* Strategic Insights */}
-          
-        </aside>
-      </div>
+      )}
     </div>
   );
 }

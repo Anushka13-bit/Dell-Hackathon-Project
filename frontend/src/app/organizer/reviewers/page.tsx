@@ -30,6 +30,9 @@ const validHackathons = hackathons.filter((hackathon) => {
 export default function OrganizerReviewers() {
 
   const [showAssignReviewerModal, setShowAssignReviewerModal] = useState(false);
+  const [reviewers, setReviewers] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [reviewerForm, setReviewerForm] = useState({
     name: "",
@@ -93,6 +96,22 @@ export default function OrganizerReviewers() {
   };
 
   useEffect(() => {
+  const apiUrl =
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  Promise.all([
+    fetch(`${apiUrl}/reviewers/`).then((r) => r.json()),
+    fetch(`${apiUrl}/assignments/`).then((r) => r.json()),
+  ])
+    .then(([reviewersData, assignmentsData]) => {
+      setReviewers(reviewersData || []);
+      setAssignments(assignmentsData || []);
+    })
+    .catch(console.error)
+    .finally(() => setLoading(false));
+}, []);
+
+  useEffect(() => {
     // Subtle entry animations
     const cards = document.querySelectorAll('.metric-card-hover, .bg-white');
     cards.forEach((card, index) => {
@@ -105,6 +124,25 @@ export default function OrganizerReviewers() {
       }, 100 * index);
     });
   }, []);
+
+  const reviewerRows = reviewers.map((reviewer) => {
+  const reviewerAssignments = assignments.filter(
+    (a) => a.reviewer_id === reviewer.reviewer_id
+  );
+
+  return {
+    ...reviewer,
+    assignedTeams: reviewerAssignments.length,
+  };
+});
+
+if (loading) {
+  return (
+    <div className="p-8">
+      Loading reviewers...
+    </div>
+  );
+}
 
   return (
     <div>
@@ -124,28 +162,36 @@ export default function OrganizerReviewers() {
           <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 metric-card-hover">
             <p className="text-on-surface-variant font-label-sm uppercase mb-2 text-[12px]">Total Reviewers</p>
             <div className="flex items-end justify-between">
-              <h3 className="font-headline-md text-[32px] leading-none">42</h3>
+              <h3 className="font-headline-md text-[32px] leading-none">
+  {reviewers.length}
+</h3>
               <span className="text-primary font-bold text-[12px]">+4</span>
             </div>
           </div>
           <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 metric-card-hover">
             <p className="text-on-surface-variant font-label-sm uppercase mb-2 text-[12px]">Active</p>
             <div className="flex items-end justify-between">
-              <h3 className="font-headline-md text-[32px] leading-none">38</h3>
+              <h3 className="font-headline-md text-[32px] leading-none">
+  {reviewers.filter(r => (r.current_load ?? 0) > 0).length}
+</h3>
               <div className="w-1.5 h-1.5 rounded-full bg-green-500 mb-2"></div>
             </div>
           </div>
           <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 metric-card-hover">
             <p className="text-on-surface-variant font-label-sm uppercase mb-2 text-[12px]">Assigned</p>
             <div className="flex items-end justify-between">
-              <h3 className="font-headline-md text-[32px] leading-none">156</h3>
+              <h3 className="font-headline-md text-[32px] leading-none">
+  {assignments.length}
+</h3>
               <span className="material-symbols-outlined text-outline">assignment</span>
             </div>
           </div>
           <div className="bg-surface-container-lowest p-6 rounded-xl border border-outline-variant/30 metric-card-hover">
             <p className="text-on-surface-variant font-label-sm uppercase mb-2 text-[12px]">Pending</p>
             <div className="flex items-end justify-between">
-              <h3 className="font-headline-md text-[32px] leading-none">44</h3>
+              <h3 className="font-headline-md text-[32px] leading-none">
+  0
+</h3>
               <div className="px-1.5 py-0.5 bg-secondary-container text-on-secondary-container rounded text-[10px] mb-1 font-bold">URGENT</div>
             </div>
           </div>
@@ -322,116 +368,58 @@ export default function OrganizerReviewers() {
                       <th className="px-8 py-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-outline-variant/10">
-                    {/* Row 1 */}
-                    <tr className="hover:bg-surface-container-lowest/50 transition-colors group">
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-3">
-                          <img className="w-9 h-9 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA3gyrm8jTJhjIMlSdJ2Xe1Trv4UIuJI2fMbQAF17oXkY4rJ6Di5_Q6w8tj9L3WIIZ9XCayXzGtRbtwa5v7TzIvvxU7TdeaMSgE7i9t3fj1UAcLaUoreLmI2QjiaOC-oERZwfZgxPSvl6x7j19LBB5_tFqUaYeMVNWhXQsRbbwn3PAOw0D8SjrW08CP8_xmAbiV70ShgfL1FIm08oajaE8HWGAEfxUq2Q4GgvCFND89I2rGYucgZeQMsS2tddTBbiYGXKXIZYmQi34" alt="Reviewer" />
-                          <div>
-                            <p className="font-bold text-[14px]">Elena Rodriguez</p>
-                            <p className="text-[11px] text-outline">Summit University</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-5">
-                        <span className="px-2 py-0.5 bg-surface-container text-on-surface-variant rounded text-[10px] font-bold">Product Design</span>
-                      </td>
-                      <td className="px-4 py-5 text-center font-medium">10</td>
-                      <td className="px-4 py-5 text-center text-primary font-bold">8</td>
-                      <td className="px-4 py-5 text-center font-bold">8.4</td>
-                      <td className="px-4 py-5">
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-[10px] font-bold">
-                          <span className="w-1 h-1 bg-green-600 rounded-full"></span> AVAILABLE
-                        </span>
-                      </td>
-                      <td className="px-8 py-5 text-right space-x-2">
-                        <button className="text-primary hover:text-primary/70 font-bold text-[12px] flex items-center gap-1 inline-flex"><span className="material-symbols-outlined text-[16px]">visibility</span>Teams</button>
-                        <button className="text-primary hover:text-primary/70 font-bold text-[12px]">Assign</button>
-                        <button className="text-outline hover:text-on-surface font-bold text-[12px]">View</button>
-                      </td>
-                    </tr>
-                    
-                    {/* Expanded detail placeholder (optional but keeping from code) */}
-                    <tr className="bg-surface-container-low/30">
-                      <td className="px-8 py-4" colSpan={7}>
-                        <div className="grid grid-cols-3 gap-4 text-[12px]">
-                          <div className="space-y-2">
-                            <p className="font-bold text-outline uppercase text-[10px]">Team Name</p>
-                            <p>EcoPulse</p>
-                            <p>GreenGrid</p>
-                          </div>
-                          <div className="space-y-2">
-                            <p className="font-bold text-outline uppercase text-[10px]">Problem Statement</p>
-                            <p className="truncate">Urban Carbon Sequestration</p>
-                            <p className="truncate">Renewable Energy Distribution</p>
-                          </div>
-                          <div className="space-y-2">
-                            <p className="font-bold text-outline uppercase text-[10px]">Status</p>
-                            <p className="text-green-600 font-bold">Evaluated</p>
-                            <p className="text-amber-600 font-bold">Pending</p>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
+                 <tbody className="divide-y divide-outline-variant/10">
+                    {reviewerRows.map((reviewer) => {
+                      const load = reviewer.current_load ?? 0;
 
-                    {/* Row 2 */}
-                    <tr className="hover:bg-surface-container-lowest/50 transition-colors group">
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-3">
-                          <img className="w-9 h-9 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA4U9ueqgoA3JRKRsJOxj_0AqGvgQE3pi9yNf2B1TZbWLV3NGbv-wFl2VYqKQKQnfmtXqVP3dEm4CC0Ra8jBNNj9yW9Hvo_NLNWIsPFt6DBM3d8ZXe5PFMRZgJXqb2QTbSnYT1FUdazrpqrKhZlYbU0hoe0X9n0ueUH9kYGLpE2ORGaq5lD5tVvSA3pXxX6Q_5BbyA2KHvCSK5tttZ_qJo8p6AV4M0jreH98j5ADZ-EzahY5Sxz6EuztIR5U8ENZeihHmkz-B2t0vI" alt="Reviewer" />
-                          <div>
-                            <p className="font-bold text-[14px]">Jonas Miller</p>
-                            <p className="text-[11px] text-outline">GreenTech Labs</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-5">
-                        <span className="px-2 py-0.5 bg-surface-container text-on-surface-variant rounded text-[10px] font-bold">Fullstack Dev</span>
-                      </td>
-                      <td className="px-4 py-5 text-center font-medium">15</td>
-                      <td className="px-4 py-5 text-center text-primary font-bold">14</td>
-                      <td className="px-4 py-5 text-center font-bold">7.2</td>
-                      <td className="px-4 py-5">
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-[10px] font-bold">
-                          <span className="w-1 h-1 bg-amber-600 rounded-full"></span> BUSY
-                        </span>
-                      </td>
-                      <td className="px-8 py-5 text-right space-x-2">
-                        <button className="text-primary hover:text-primary/70 font-bold text-[12px] flex items-center gap-1 inline-flex"><span className="material-symbols-outlined text-[16px]">visibility</span>Teams</button>
-                        <button className="text-primary hover:text-primary/70 font-bold text-[12px]">Assign</button>
-                        <button className="text-outline hover:text-on-surface font-bold text-[12px]">View</button>
-                      </td>
-                    </tr>
+                      return (
+                        <tr
+                          key={reviewer.reviewer_id}
+                          className="hover:bg-surface-container-lowest/50 transition-colors group"
+                        >
+                          <td className="px-8 py-5">
+                            <div>
+                              <p className="font-bold text-[14px]">
+                                {reviewer.name}
+                              </p>
+                              <p className="text-[11px] text-outline">
+                                Reviewer
+                              </p>
+                            </div>
+                          </td>
 
-                    {/* Row 3 */}
-                    <tr className="hover:bg-surface-container-lowest/50 transition-colors group">
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-3">
-                          <img className="w-9 h-9 rounded-full object-cover grayscale group-hover:grayscale-0 transition-all" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjyUpyp_y0LdAMZlh2WphbF2uELx7WRCAKTy8zHTWGEwb6Wv3PV-HI1Tu4muZfreiXj0Kl0aQya2j5ltPt9foN5guMQxU4D5Da2_qTbJHka4hG01bBmLuPKigJ1UGJTSpAgoXF7PxBEg3pCQUAOg4YMkf3HKwS8iRsSW0cYJuxTY0UAjyhKz7DG9ur6JqaO6nZUYsvtSgGxFwm3oxt5m6XQTTGMKYykV6SIgnQtRy3TD547TI1dOGNlTu9VrarJT-RcFo1FvDVi2Y" alt="Reviewer" />
-                          <div>
-                            <p className="font-bold text-[14px]">Amara Okafor</p>
-                            <p className="text-[11px] text-outline">Global Health Inst.</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-5">
-                        <span className="px-2 py-0.5 bg-surface-container text-on-surface-variant rounded text-[10px] font-bold">HealthTech</span>
-                      </td>
-                      <td className="px-4 py-5 text-center font-medium">22</td>
-                      <td className="px-4 py-5 text-center text-primary font-bold">12</td>
-                      <td className="px-4 py-5 text-center font-bold">9.5</td>
-                      <td className="px-4 py-5">
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-[10px] font-bold">
-                          <span className="w-1 h-1 bg-red-600 rounded-full"></span> OVERLOADED
-                        </span>
-                      </td>
-                      <td className="px-8 py-5 text-right space-x-2">
-                        <button className="text-primary hover:text-primary/70 font-bold text-[12px] flex items-center gap-1 inline-flex"><span className="material-symbols-outlined text-[16px]">visibility</span>Teams</button>
-                        <button className="text-primary hover:text-primary/70 font-bold text-[12px]">Assign</button>
-                        <button className="text-outline hover:text-on-surface font-bold text-[12px]">View</button>
-                      </td>
-                    </tr>
+                          <td className="px-4 py-5">
+                            <span className="px-2 py-0.5 bg-surface-container text-on-surface-variant rounded text-[10px] font-bold">
+                              {reviewer.primary_specialization || "General"}
+                            </span>
+                          </td>
+
+                          <td className="px-4 py-5 text-center font-medium">
+                            {reviewer.assignedTeams}
+                          </td>
+
+                          <td className="px-4 py-5 text-center text-primary font-bold">
+                            {load}
+                          </td>
+
+                          <td className="px-4 py-5 text-center font-bold">
+                            -
+                          </td>
+
+                          <td className="px-4 py-5">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-[10px] font-bold">
+                              ACTIVE
+                            </span>
+                          </td>
+
+                          <td className="px-8 py-5 text-right">
+                            <button className="text-primary hover:text-primary/70 font-bold text-[12px]">
+                              View
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
