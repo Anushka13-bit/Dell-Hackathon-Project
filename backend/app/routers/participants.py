@@ -18,9 +18,7 @@ class ParticipantCreate(BaseModel):
     id: str
     name: Optional[str] = None
     college_name: Optional[str] = None
-    year_of_study: Optional[str] = None
     github_url: Optional[str] = None
-    linkedin_url: Optional[str] = None
     declared_skills: Optional[List[str]] = []
     skill_vector: Optional[dict] = None
     team_id: Optional[str] = None
@@ -29,9 +27,7 @@ class ParticipantOut(BaseModel):
     id: str
     name: Optional[str] = None
     college_name: Optional[str] = None
-    year_of_study: Optional[str] = None
     github_url: Optional[str] = None
-    linkedin_url: Optional[str] = None
     declared_skills: Optional[List[str]] = []
     skill_vector: Optional[dict] = None
     team_id: Optional[str] = None

@@ -10,6 +10,10 @@ from ..deps import get_db
 from ..models.assignment import Assignment
 from ..models.reviewer import Reviewer
 
+from uuid import UUID
+from datetime import datetime
+from typing import Any
+
 from app.tasks.reviewer_tasks import (
     reviewer_assignment_task
 )
@@ -25,14 +29,16 @@ class AssignmentCreate(BaseModel):
     compatibility_score: Optional[float] = None
     explanation: Optional[dict] = None
 
-
 class AssignmentOut(BaseModel):
-    assignment_id: str
-    idea_id: Optional[str] = None
-    reviewer_id: Optional[str] = None
+    assignment_id: UUID
+    idea_id: Optional[UUID] = None
+    reviewer_id: Optional[UUID] = None
+
     compatibility_score: Optional[float] = None
-    explanation: Optional[dict] = None
-    created_at: Optional[str] = None
+
+    explanation: Optional[Any] = None
+
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

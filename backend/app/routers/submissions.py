@@ -1,4 +1,5 @@
 import uuid
+from uuid import UUID
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -23,13 +24,16 @@ class SubmissionCreate(BaseModel):
 
 
 class SubmissionOut(BaseModel):
-    idea_id: str
-    team_id: Optional[str] = None
-    ps_id: Optional[str] = None
+    idea_id: UUID
+    team_id: Optional[UUID] = None
+    ps_id: Optional[UUID] = None
+
     title: Optional[str] = None
     description: Optional[str] = None
     idea_vector: Optional[dict] = None
-    submitted_at: Optional[str] = None
+
+    submitted_at: Optional[datetime] = None
+
     status: Optional[str] = None
     ai_feedback: Optional[str] = None
 

@@ -1,4 +1,6 @@
+from uuid import UUID
 import uuid
+from datetime import datetime
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -6,7 +8,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..database import execute, fetch_all
 from ..deps import get_db
 from ..models.evaluation import Evaluation
 
@@ -16,6 +17,7 @@ except ImportError:
     def log_event(*args, **kwargs): pass
 
 router = APIRouter()
+
 
 class EvaluationSubmitRequest(BaseModel):
     hackathon_id: str
@@ -98,13 +100,15 @@ class EvaluationCreate(BaseModel):
 
 
 class EvaluationOut(BaseModel):
-    evaluation_id: str
-    assignment_id: Optional[str] = None
-    reviewer_id: Optional[str] = None
-    idea_id: Optional[str] = None
+    evaluation_id: UUID
+    assignment_id: Optional[UUID] = None
+    reviewer_id: Optional[UUID] = None
+    idea_id: Optional[UUID] = None
+
     score: Optional[float] = None
     feedback: Optional[str] = None
-    created_at: Optional[str] = None
+
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -191,19 +195,5 @@ async def compute_results(hackathon_id: str, db: Session = Depends(get_db)):
     return {
         "status": "queued",
         "message": "Result computation and feedback generation started",
-        "task_id": task.id
-    }
-
-class FairnessTriggerRequest(BaseModel):
-    round_id: str
-
-@router.post("/trigger-fairness")
-async def trigger_fairness(request: FairnessTriggerRequest):
-    """Triggers the fairness engine pipeline in the background."""
-    from app.tasks.fairness_tasks import fairness_pipeline_task
-    task = fairness_pipeline_task.delay(request.round_id)
-    return {
-        "status": "queued",
-        "message": "Fairness pipeline started",
         "task_id": task.id
     }

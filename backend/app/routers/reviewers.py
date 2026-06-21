@@ -1,4 +1,5 @@
 import uuid
+from uuid import UUID
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -8,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from ..deps import get_db
 from ..models.reviewer import Reviewer
+
+from typing import Any
 
 router = APIRouter()
 
@@ -23,16 +26,21 @@ class ReviewerCreate(BaseModel):
     secondary_specializations: Optional[list] = None
 
 
+
 class ReviewerOut(BaseModel):
-    reviewer_id: str
+    reviewer_id: UUID
     name: str
     resume_text: Optional[str] = None
-    skills_json: Optional[dict] = None
+
+    skills_json: Optional[Any] = None
+
     skill_vector: Optional[dict] = None
     primary_specialization: Optional[str] = None
     secondary_specializations: Optional[list] = None
+
     current_load: Optional[int] = 0
-    created_at: Optional[str] = None
+
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -69,14 +77,19 @@ async def register_reviewer(
 
     reviewer_id = uuid.uuid4()
     reviewer = Reviewer(
-        reviewer_id=reviewer_id,
-        name=name,
-        resume_text=text,
-        primary_specialization=primary_specialization,
-        secondary_specializations=[],
-        current_load=0,
-        created_at=datetime.now(timezone.utc),
-    )
+    reviewer_id=reviewer_id,
+    name=name,
+    resume_text=text,
+
+    skills_json=[],
+    skill_vector={},
+
+    primary_specialization=primary_specialization,
+    secondary_specializations=[],
+
+    current_load=0,
+    created_at=datetime.now(timezone.utc),
+)
     db.add(reviewer)
     db.commit()
     db.refresh(reviewer)
