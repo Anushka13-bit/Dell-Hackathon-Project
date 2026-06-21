@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Text, Integer, VARCHAR
 from sqlalchemy.dialects.postgresql import UUID, JSON, TIMESTAMP
+from sqlalchemy import String
 
 from .base import Base
 
@@ -10,6 +11,7 @@ class Reviewer(Base):
     reviewer_id = Column(UUID(as_uuid=True), primary_key=True)
     name = Column(VARCHAR(255), nullable=False)
     resume_text = Column(Text, nullable=True)
+    email = Column(String, unique=True, nullable=True)
     skills_json = Column(JSON, nullable=True)
     skill_vector = Column(JSON, nullable=True)
     primary_specialization = Column(VARCHAR(100), nullable=True)
