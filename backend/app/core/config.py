@@ -9,8 +9,14 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "DEV_SECRET_KEY_CHANGE_IN_PROD"
     
     # CORS
-    BACKEND_CORS_ORIGINS: list[str] = ["*"]  # Restrict in production
-    
+    BACKEND_CORS_ORIGINS: list[str] = [
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000",
+        "http://localhost:3001", 
+        "http://127.0.0.1:3001",
+        "http://192.168.1.110:3000",
+        "http://192.168.1.110:3001"
+    ]
     # Rate Limiting
     RATE_LIMIT_DEFAULT: str = "100/minute"
     

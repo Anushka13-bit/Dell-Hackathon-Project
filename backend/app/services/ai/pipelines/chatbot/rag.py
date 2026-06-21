@@ -2,9 +2,9 @@ import json
 from typing import Dict, List
 from sqlalchemy.orm import Session
 from app.models.knowledge_base import KnowledgeDocument
-from app.services.ai.core.llm import call_json
+from app.services.ai.core.llm import call_json_async
 
-def ask_chatbot(question: str, hackathon_id: str, db: Session) -> Dict[str, str]:
+async def ask_chatbot(question: str, hackathon_id: str, db: Session) -> Dict[str, str]:
     """Retrieves context and generates an answer using the RAG pipeline."""
     
     # Simple semantic search (mocked via direct fetch for demo if embeddings not populated)
@@ -27,4 +27,4 @@ Return a strictly valid JSON object with the following keys:
 - "confidence": A score from 0.0 to 1.0 indicating how confident you are in the answer based on the context.
 """
 
-    return call_json(prompt)
+    return await call_json_async(prompt)

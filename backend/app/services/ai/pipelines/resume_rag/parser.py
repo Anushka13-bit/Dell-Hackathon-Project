@@ -11,9 +11,40 @@ import logging
 
 from app.services.ai.core.llm import call_json_async
 from app.services.ai.core.schemas import ParsedResume, SkillVector
+from app.services.ai.core.skill_taxonomy import category_names
 from app.services.ai.pipelines.resume_rag.skill_scoring import compute_skill_vector
 
 logger = logging.getLogger(__name__)
+
+
+def _skill_score_prompt(resume_text: str) -> str:
+    cats = ", ".join(category_names())
+    return f"""You are a technical recruiter. Rate this candidate's proficiency in each
+skill category on a scale from 0.0 (no evidence) to 1.0 (expert).
+
+Return ONLY a JSON object with these exact keys: {cats}
+Each value must be a float between 0.0 and 1.0.
+
+Resume:
+{resume_text}"""
+
+
+async def _get_llm_scores(resume_text: str) -> dict[str, float]:
+    """Ask the LLM to rate the candidate across taxonomy categories."""
+    try:
+        raw = await call_json_async(_skill_score_prompt(resume_text))
+        valid_cats = set(category_names())
+        scores = {}
+        for cat in valid_cats:
+            val = raw.get(cat, 0.0)
+            try:
+                scores[cat] = max(0.0, min(1.0, float(val)))
+            except (TypeError, ValueError):
+                scores[cat] = 0.0
+        return scores
+    except Exception as e:
+        logger.warning("LLM skill scoring failed, using zeros: %s", e)
+        return {cat: 0.0 for cat in category_names()}
 
 
 def _parse_prompt(resume_text: str) -> str:
@@ -117,7 +148,8 @@ async def parse_and_vectorize_batch(
     async def _one(text: str) -> tuple[ParsedResume, SkillVector, list[float], dict]:
         async with semaphore:
             parsed = await parse_resume_async(text)
-            vector, embedding, breakdown = await compute_skill_vector(text, parsed.projects, {})
+            llm_scores = await _get_llm_scores(text)
+            vector, embedding, breakdown = await compute_skill_vector(text, parsed.projects, llm_scores)
             return parsed, vector, embedding, breakdown
 
     return await asyncio.gather(
