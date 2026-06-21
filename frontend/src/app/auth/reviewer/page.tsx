@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState,useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -19,6 +19,7 @@ import {
   User,
   Users,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 // ─────────────────────────────────────────────
 // TYPES
@@ -70,56 +71,6 @@ const RUBRICS: Rubric[] = [
 const TOTAL_WEIGHT = RUBRICS.reduce((sum, r) => sum + r.weight, 0); // should equal 100
 
 // ─────────────────────────────────────────────
-// MOCK DATA — replace with real fetches from actions.ts
-// ─────────────────────────────────────────────
-const MOCK_SUBMISSIONS: Submission[] = [
-  {
-    id: "sub-1",
-    teamName: "Team Mesh",
-    members: ["Aarav Sharma", "Diya Patel", "Kabir Nair"],
-    problemStatement:
-      "Rural and disaster-affected areas often lose internet connectivity, cutting off access to emergency communication and critical environmental sensor data.",
-    ideaSubmission:
-      "IoT-Mesh is a self-healing mesh network of low-power sensor nodes that relay environmental and emergency data peer-to-peer, even when centralized infrastructure is down.",
-    githubRepo: "https://github.com/ecostream/iot-mesh",
-    demoVideoUrl: "https://vimeo.com/123456789",
-    presentationDeckName: "IoT-Mesh_FinalDeck.pdf",
-    presentationDeckUrl: "#",
-    status: "pending",
-  },
-  {
-    id: "sub-2",
-    teamName: "Team Greenwave",
-    members: ["Sara Khan", "Ishaan Verma"],
-    problemStatement:
-      "Urban farms lack affordable, real-time soil and water quality monitoring, leading to inefficient resource use and lower yields.",
-    ideaSubmission:
-      "Greenwave is a solar-powered sensor pod paired with a predictive irrigation app that reduces water usage by up to 30% for small-scale urban farmers.",
-    githubRepo: "https://github.com/greenwave/sensor-pod",
-    demoVideoUrl: "https://vimeo.com/987654321",
-    presentationDeckName: "Greenwave_Pitch.pptx",
-    presentationDeckUrl: "#",
-    status: "reviewed",
-    overallScore: 86,
-  },
-  {
-    id: "sub-3",
-    teamName: "Team Pulse",
-    members: ["Meera Iyer", "Rohan Gupta", "Tara Singh"],
-    problemStatement:
-      "Patients in low-resource clinics face long diagnostic delays due to a shortage of trained radiologists.",
-    ideaSubmission:
-      "Pulse is a lightweight on-device ML model that pre-screens chest X-rays for common conditions, flagging urgent cases for radiologist review.",
-    githubRepo: "https://github.com/pulse-health/xray-screen",
-    demoVideoUrl: "https://vimeo.com/192837465",
-    presentationDeckName: "Pulse_Deck_Final.pdf",
-    presentationDeckUrl: "#",
-    status: "reviewed",
-    overallScore: 91,
-  },
-];
-
-// ─────────────────────────────────────────────
 // HELPERS — colored with real design tokens
 // secondary (rose) = Reviewer's brand color, same family as the
 // Reviewer Login button / "Innovation" hero text on the landing page
@@ -145,15 +96,67 @@ function SubmissionStatusBadge({ status }: { status: SubmissionStatus }) {
 type View = "submissions" | "detail";
 
 export default function ReviewerDashboard() {
+  const router = useRouter();
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+const loadAssignments = async () => {
+  try {
+    const reviewerId =
+  localStorage.getItem("reviewerId");
+
+  if (!reviewerId) {
+    router.push("/auth/reviewer-login");
+    return;
+}
+
+    const teams = await fetch(
+      `http://127.0.0.1:8000/assignments/reviewer-dashboard/${reviewerId}`
+    ).then((r) => r.json());
+
+    setSubmissions(
+      teams.map((team: any) => ({
+        id: team.idea_id,
+        teamName: team.team_name,
+        members: team.members,
+        problemStatement: "",
+        ideaSubmission: "",
+        githubRepo: "",
+        demoVideoUrl: "",
+        presentationDeckName: "",
+        presentationDeckUrl: "",
+        status:
+          team.status.toLowerCase() === "reviewed"
+            ? "reviewed"
+            : "pending",
+      }))
+    );
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+useEffect(() => {
+  const reviewerId =
+    localStorage.getItem("reviewerId");
+
+  if (!reviewerId) {
+    router.push("/auth/reviewer-login");
+    return;
+  }
+  loadAssignments();
+}, []);
+
   const [view, setView] = useState<View>("submissions");
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
+  const [submissionDetail, setSubmissionDetail] = useState<any>(null);
 
   // rubricId -> score
   const [rubricScores, setRubricScores] = useState<Record<string, number>>({});
   const [commentInput, setCommentInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const selectedSubmission = MOCK_SUBMISSIONS.find((s) => s.id === selectedSubmissionId) || null;
+  const selectedSubmission = submissions.find((s) => s.id === selectedSubmissionId) || null;
 
   const totalScore = useMemo(() => {
     const weighted = RUBRICS.reduce((sum, rubric) => {
@@ -164,12 +167,23 @@ export default function ReviewerDashboard() {
     return Math.round(weighted * 10) / 10; // round to 1 decimal
   }, [rubricScores]);
 
-  const openSubmission = (id: string) => {
+  const openSubmission = async (id: string) => {
+  try {
+    const detail = await fetch(
+      `http://127.0.0.1:8000/assignments/reviewer-detail/${id}`
+    ).then((r) => r.json());
+
+    console.log("DETAIL", detail);
+
+    setSubmissionDetail(detail);
     setSelectedSubmissionId(id);
     setRubricScores({});
     setCommentInput("");
     setView("detail");
-  };
+  } catch (err) {
+    console.error(err);
+  }
+};
 
   const backToSubmissions = () => {
     setSelectedSubmissionId(null);
@@ -181,39 +195,41 @@ export default function ReviewerDashboard() {
     setRubricScores((prev) => ({ ...prev, [rubricId]: value }));
   };
 
-  const handleSubmitReview = async () => {
-    if (!selectedSubmission) return;
-    try {
-      setIsSubmitting(true);
-      const payload = {
-        assignment_id: "demo-assignment-id",
-        reviewer_id: "demo-reviewer-id",
-        idea_id: selectedSubmission.id,
-        score: totalScore,
-        feedback: commentInput
-      };
+const submitReview = async () => {
+  try {
+    const reviewerId =
+      localStorage.getItem("reviewerId");
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${apiUrl}/evaluations/submit`, {
+    const response = await fetch(
+      "http://localhost:8000/evaluations/evaluate",
+      {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        alert(`Review submitted — Overall Score: ${totalScore}/100`);
-        backToSubmissions();
-      } else {
-        alert("Failed to submit review");
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          reviewer_id: reviewerId,
+          idea_id: selectedSubmissionId,
+          score: totalScore,
+          feedback: commentInput,
+        }),
       }
-    } catch (e) {
-      console.error(e);
-      alert("Error submitting review");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    );
 
+    if (!response.ok) {
+      throw new Error("Failed to submit review");
+    }
+
+    const result = await response.json();
+
+    console.log("Evaluation saved", result);
+
+    setReviewSubmitted(true);
+  } catch (error) {
+    console.error(error);
+    console.error("Failed to submit review");
+  }
+};
   return (
     <div className="bg-background min-h-screen text-on-surface font-body-md relative">
       <style jsx global>{`
@@ -233,15 +249,23 @@ export default function ReviewerDashboard() {
             <Link href="/" className="flex items-center mt-1">
                 <Image src="/logo.png" alt="HackOS" width={840} height={240} className="h-60 w-auto object-contain" />
             </Link>
-            <span className="hidden md:inline text-on-surface-variant text-[13px] ml-2 pl-3 border-l border-outline-variant/40">
-              Reviewer Console
-            </span>
+
           </div>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-secondary/15 flex items-center justify-center">
               <User className="w-4.5 h-4.5 text-secondary" />
             </div>
           </div>
+          <button
+            onClick={() => {
+              localStorage.removeItem("reviewerId");
+              localStorage.removeItem("reviewerName");
+              router.push("/");
+            }}
+            className="px-4 py-2 rounded-lg border"
+          >
+            Logout
+            </button>
         </div>
       </header>
 
@@ -270,12 +294,12 @@ export default function ReviewerDashboard() {
                   </span>
                   <span className="flex items-center gap-1.5">
                     <Users className="w-4 h-4 text-tertiary" />
-                    {MOCK_SUBMISSIONS.length} teams submitted
+                    {submissions.length} teams submitted
                   </span>
                 </div>
               </div>
 
-              {MOCK_SUBMISSIONS.length === 0 ? (
+              {submissions.length === 0 ? (
                 <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-16 text-center border border-white/50">
                   <div className="w-16 h-16 rounded-2xl bg-secondary/10 flex items-center justify-center mx-auto mb-4">
                     <Inbox className="w-7 h-7 text-secondary/60" />
@@ -284,9 +308,21 @@ export default function ReviewerDashboard() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-4">
-                  {MOCK_SUBMISSIONS.map((s) => (
-                    <button
+                  {submissions.map((s, index) => (
+                    <motion.button
                       key={s.id}
+                      initial={{
+                        opacity: 0,
+                        y: 20,
+                      }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                      }}
+                      transition={{
+                        duration: 0.4,
+                        delay: index * 0.15,
+                      }}
                       onClick={() => openSubmission(s.id)}
                       className="cursor-pointer text-left bg-white/80 backdrop-blur-xl rounded-2xl p-6 hover:shadow-lg transition-all duration-300 flex items-center justify-between gap-4 flex-wrap group border border-white/50 hover:border-secondary/30"
                     >
@@ -310,7 +346,7 @@ export default function ReviewerDashboard() {
                         <SubmissionStatusBadge status={s.status} />
                         <ChevronRight className="w-5 h-5 text-on-surface-variant group-hover:translate-x-1 group-hover:text-secondary transition-all" />
                       </div>
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
               )}
@@ -318,7 +354,7 @@ export default function ReviewerDashboard() {
           )}
 
           {/* ───────────── SUBMISSION DETAIL VIEW ───────────── */}
-          {view === "detail" && selectedSubmission && (
+          {view === "detail" && submissionDetail && (
             <motion.div
               key="detail"
               initial={{ opacity: 0, y: 10 }}
@@ -341,14 +377,18 @@ export default function ReviewerDashboard() {
                     <Users className="w-6 h-6 text-tertiary" />
                   </div>
                   <div>
-                    <h1 className="font-headline-sm text-[24px] tracking-tight">{selectedSubmission.teamName}</h1>
+                    <h1 className="font-headline-sm text-[24px] tracking-tight">{submissionDetail.team_name}</h1>
                     <p className="text-on-surface-variant text-[14px]">
-                      {selectedSubmission.members.join(" • ")}
+                      {submissionDetail.members.join(" • ")}
                     </p>
                   </div>
                 </div>
-                <SubmissionStatusBadge status={selectedSubmission.status} />
-              </div>
+                <SubmissionStatusBadge
+                    status={
+                      selectedSubmission?.status ?? "pending"
+                    }
+                  />
+                                </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left: submission content */}
@@ -362,7 +402,7 @@ export default function ReviewerDashboard() {
                       <h2 className="font-headline-sm text-[18px]">Problem Statement</h2>
                     </div>
                     <p className="text-on-surface-variant leading-relaxed">
-                      {selectedSubmission.problemStatement}
+                      {submissionDetail.problem_statement_text ||submissionDetail.problem_statement_title}
                     </p>
                   </section>
 
@@ -375,7 +415,7 @@ export default function ReviewerDashboard() {
                       <h2 className="font-headline-sm text-[18px]">Idea Submission</h2>
                     </div>
                     <p className="text-on-surface-variant leading-relaxed">
-                      {selectedSubmission.ideaSubmission}
+                      {submissionDetail.idea_description}
                     </p>
                   </section>
 
@@ -387,17 +427,21 @@ export default function ReviewerDashboard() {
                       </div>
                       <h2 className="font-headline-sm text-[18px]">GitHub Repository</h2>
                     </div>
-                    <a
-                      href={selectedSubmission.githubRepo}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 bg-surface-container-low rounded-2xl px-5 py-3.5 hover:bg-surface-container transition-colors group border border-outline-variant/20"
-                    >
-                      <Link2 className="w-4.5 h-4.5 text-on-surface-variant flex-shrink-0" />
-                      <span className="text-on-surface group-hover:text-secondary transition-colors truncate">
-                        {selectedSubmission.githubRepo}
-                      </span>
-                    </a>
+                    {submissionDetail.github_url ? (
+                      <a
+                        href={submissionDetail.github_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 bg-surface-container-low rounded-2xl px-5 py-3.5"
+                      >
+                        <Link2 className="w-4.5 h-4.5" />
+                        <span>{submissionDetail.github_url}</span>
+                      </a>
+                    ) : (
+                      <p className="text-on-surface-variant">
+                        No repository submitted
+                      </p>
+                    )}
                   </section>
 
                   {/* 4. Demo Video */}
@@ -408,17 +452,21 @@ export default function ReviewerDashboard() {
                       </div>
                       <h2 className="font-headline-sm text-[18px]">Demo Video</h2>
                     </div>
-                    <a
-                      href={selectedSubmission.demoVideoUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 bg-secondary/10 rounded-2xl px-5 py-3.5 hover:bg-secondary/15 transition-colors group border border-secondary/10"
-                    >
-                      <PlayCircle className="w-4.5 h-4.5 text-secondary flex-shrink-0" />
-                      <span className="text-on-surface group-hover:text-secondary transition-colors truncate">
-                        {selectedSubmission.demoVideoUrl}
-                      </span>
-                    </a>
+                    {submissionDetail.video_url ? (
+                      <a
+                        href={submissionDetail.video_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 bg-secondary/10 rounded-2xl px-5 py-3.5"
+                      >
+                        <PlayCircle className="w-4.5 h-4.5 text-secondary" />
+                        <span>{submissionDetail.video_url}</span>
+                      </a>
+                    ) : (
+                      <p className="text-on-surface-variant">
+                        No demo video submitted
+                      </p>
+                    )}
                   </section>
 
                   {/* 5. Presentation Deck */}
@@ -429,17 +477,51 @@ export default function ReviewerDashboard() {
                       </div>
                       <h2 className="font-headline-sm text-[18px]">Presentation Deck</h2>
                     </div>
-                    <a
-                      href={selectedSubmission.presentationDeckUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 bg-tertiary/10 rounded-2xl px-5 py-3.5 hover:bg-tertiary/15 transition-colors group border border-tertiary/10"
-                    >
-                      <FileText className="w-4.5 h-4.5 text-tertiary flex-shrink-0" />
-                      <span className="text-on-surface group-hover:text-tertiary transition-colors">
-                        {selectedSubmission.presentationDeckName}
-                      </span>
-                    </a>
+                    {submissionDetail.ppt_url ? (
+                      <a
+                        href={submissionDetail.ppt_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 bg-tertiary/10 rounded-2xl px-5 py-3.5"
+                      >
+                        <FileText className="w-4.5 h-4.5 text-tertiary" />
+                        <span>View Presentation Deck</span>
+                      </a>
+                    ) : (
+                      <p className="text-on-surface-variant">
+                        No presentation uploaded
+                      </p>
+                    )}
+                  </section>
+
+                                  <section className="bg-white/80 backdrop-blur-xl rounded-3xl p-8 border border-white/50">
+
+                    <div className="flex items-center gap-2.5 mb-4">
+
+                      <div className="w-9 h-9 rounded-xl bg-secondary/10 flex items-center justify-center">
+
+                        <Lightbulb className="w-4.5 h-4.5 text-secondary" />
+
+                      </div>
+
+
+
+                      <h2 className="font-headline-sm text-[18px]">
+
+                        AI Feedback
+
+                      </h2>
+
+                    </div>
+
+
+
+                    <p className="text-on-surface-variant whitespace-pre-wrap leading-relaxed">
+
+                      {submissionDetail.ai_feedback || "No feedback available"}
+
+                    </p>
+
                   </section>
                 </div>
 
@@ -521,19 +603,47 @@ export default function ReviewerDashboard() {
                       className="w-full mb-6 px-4 py-3 rounded-xl bg-white/70 border border-white/50 text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-on-secondary-container/30 resize-none"
                     />
 
-                    <button 
-                      onClick={handleSubmitReview}
-                      disabled={isSubmitting}
-                      className="px-6 py-2.5 bg-primary text-white font-bold rounded-full hover:bg-primary/90 transition-all shadow-md active:scale-95 disabled:opacity-50"
-                    >
-                      {isSubmitting ? "Submitting..." : "Submit Review"}
-                    </button>
+                    <button
+                        onClick={submitReview}
+                        className="w-full bg-secondary text-white py-3 rounded-xl font-semibold"
+                      >
+                        Submit Review
+                      </button>
                   </div>
                 </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
+
+        {reviewSubmitted && (
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100]">
+    <div className="bg-white rounded-3xl p-8 w-[420px] max-w-[90vw] text-center shadow-2xl">
+      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-tertiary/10 flex items-center justify-center">
+        <CheckCircle2 className="w-8 h-8 text-tertiary" />
+      </div>
+
+      <h2 className="text-2xl font-bold mb-2">
+        Review Submitted
+      </h2>
+
+      <p className="text-on-surface-variant mb-6">
+        Your evaluation has been saved successfully.
+      </p>
+
+      <button
+        onClick={async() => {
+          await loadAssignments();
+          setReviewSubmitted(false);
+          backToSubmissions();
+        }}
+        className="w-full bg-secondary text-white py-3 rounded-xl font-semibold hover:opacity-90 transition"
+      >
+        Review Another Team
+      </button>
+    </div>
+  </div>
+)}
       </main>
     </div>
   );

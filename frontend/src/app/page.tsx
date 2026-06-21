@@ -5,9 +5,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 
+
 export default function LandingPage() {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [showRoleModal, setShowRoleModal] = useState(false);
+  const [showReviewerMenu, setShowReviewerMenu] = useState(false);
 
   useEffect(() => {
     const target = new Date("2024-12-31T23:59:59").getTime();
@@ -72,11 +74,34 @@ export default function LandingPage() {
               </button>
             </Link>
 
-            <Link href="/auth/reviewer" className="hidden md:block">
-              <button className="bg-[#D18A8A] border border-white/40 text-white px-6 py-2.5 rounded-xl font-label-md shadow-lg hover:shadow-xl hover:bg-[#C67878] transition-all duration-300">
-                Reviewer Login
-              </button>
-            </Link>
+            <div className="relative hidden md:block">
+            <button
+              onClick={() =>
+                setShowReviewerMenu(!showReviewerMenu)
+              }
+              className="bg-[#D18A8A] border border-white/40 text-white px-6 py-2.5 rounded-xl font-label-md shadow-lg hover:shadow-xl hover:bg-[#C67878] transition-all duration-300"
+            >
+              Reviewer ▾
+            </button>
+
+            {showReviewerMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border z-50 overflow-hidden">
+                <Link
+                  href="/auth/reviewer-login"
+                  className="block px-4 py-3 hover:bg-gray-100"
+                >
+                  Reviewer Login
+                </Link>
+
+                <Link
+                  href="/auth/reviewer-register"
+                  className="block px-4 py-3 hover:bg-gray-100"
+                >
+                  Reviewer Register
+                </Link>
+              </div>
+            )}
+          </div>
           </div>
         </nav>
       </header>

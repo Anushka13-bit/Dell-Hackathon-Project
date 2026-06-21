@@ -19,13 +19,15 @@ router = APIRouter()
 
 class ReviewerCreate(BaseModel):
     name: str
+    email: Optional[str] = None
     resume_text: Optional[str] = None
     skills_json: Optional[dict] = None
     skill_vector: Optional[dict] = None
     primary_specialization: Optional[str] = None
     secondary_specializations: Optional[list] = None
 
-
+class ReviewerLogin(BaseModel):
+    email: str
 
 class ReviewerOut(BaseModel):
     reviewer_id: UUID
@@ -41,6 +43,7 @@ class ReviewerOut(BaseModel):
     current_load: Optional[int] = 0
 
     created_at: Optional[datetime] = None
+    email: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -54,6 +57,7 @@ from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form
 @router.post("/register", response_model=ReviewerOut)
 async def register_reviewer(
     name: str = Form(...),
+    email: str = Form(...),
     primary_specialization: Optional[str] = Form(None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
@@ -80,6 +84,7 @@ async def register_reviewer(
     reviewer_id=reviewer_id,
     name=name,
     resume_text=text,
+    email=email,
 
     skills_json=[],
     skill_vector={},
@@ -127,12 +132,35 @@ async def update_reviewer(reviewer_id: str, data: ReviewerCreate, db: Session = 
     r.resume_text = data.resume_text
     r.skills_json = data.skills_json
     r.skill_vector = data.skill_vector
+    r.email = data.email
     r.primary_specialization = data.primary_specialization
     r.secondary_specializations = data.secondary_specializations
     db.commit()
     db.refresh(r)
     return r
 
+@router.post("/login")
+async def login_reviewer(
+    data: ReviewerLogin,
+    db: Session = Depends(get_db)
+):
+    reviewer = (
+        db.query(Reviewer)
+        .filter(Reviewer.email == data.email)
+        .first()
+    )
+
+    if not reviewer:
+        raise HTTPException(
+            status_code=404,
+            detail="Reviewer not found"
+        )
+
+    return {
+        "reviewer_id": str(reviewer.reviewer_id),
+        "name": reviewer.name,
+        "email": reviewer.email
+    }
 
 @router.delete("/{reviewer_id}")
 async def delete_reviewer(reviewer_id: str, db: Session = Depends(get_db)):
