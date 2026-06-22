@@ -240,9 +240,6 @@ export default function RegistrationIntelligenceModule({
     <div className="mx-auto w-full max-w-[1500px] p-8">
       <section className="mb-8 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <p className="mb-3 inline-flex rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[12px] font-bold uppercase tracking-widest text-primary">
-            PRD Section 9
-          </p>
           <h1 className="font-headline-md text-[32px] font-bold text-on-surface">{title}</h1>
           <p className="mt-2 max-w-3xl text-[16px] leading-relaxed text-on-surface-variant">
             {subtitle}
