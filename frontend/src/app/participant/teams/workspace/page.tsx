@@ -27,13 +27,13 @@ export default function TeamWorkspace() {
         if (!session?.user?.id) return;
 
         const apiBase = getApiBaseUrl();
-        const pRes = await fetch(`${apiBase}/participants/${session.user.id}`);
+        const pRes = await fetch(`${apiBase}/participants/${session.user.id}`, { cache: 'no-store' });
         if (!pRes.ok) return;
         const pData = await pRes.json();
         setParticipant(pData);
 
         if (pData.team_id) {
-          const tRes = await fetch(`${apiBase}/teams/${pData.team_id}`);
+          const tRes = await fetch(`${apiBase}/teams/${pData.team_id}`, { cache: 'no-store' });
           if (tRes.ok) {
             const tData = await tRes.json();
             setTeam(tData);
@@ -42,7 +42,7 @@ export default function TeamWorkspace() {
 
             const teamMembers = [];
             for (const mid of tData.member_ids || []) {
-              const mRes = await fetch(`${apiBase}/participants/${mid}`);
+              const mRes = await fetch(`${apiBase}/participants/${mid}`, { cache: 'no-store' });
               if (mRes.ok) teamMembers.push(await mRes.json());
             }
             
@@ -145,7 +145,7 @@ export default function TeamWorkspace() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        ...team,
+        name: team.name,
         problem_statement: problemStatement,
       }),
     });

@@ -96,13 +96,31 @@ export default function CreateTeam() {
       setIsCreating(true);
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
+      const apiBase = getApiBaseUrl();
+      
+      if (session?.user?.id) {
+        const pRes = await fetch(`${apiBase}/participants/${session.user.id}`);
+        if (pRes.ok) {
+          const pData = await pRes.json();
+          if (pData.team_id) {
+            if (teamName) {
+              await fetch(`${apiBase}/teams/${pData.team_id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: teamName })
+              });
+            }
+            router.push("/participant/teams/workspace");
+            return;
+          }
+        }
+      }
       
       const payload = {
         name: teamName || "Unnamed Team",
         member_ids: session?.user?.id ? [session.user.id, ...invitedMemberIds] : [...invitedMemberIds]
       };
 
-      const apiBase = getApiBaseUrl();
       const res = await fetch(`${apiBase}/teams/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -141,8 +159,6 @@ export default function CreateTeam() {
         const tRes = await fetch(`${apiBase}/teams/${pData.team_id}`);
         if (tRes.ok) {
           const tData = await tRes.json();
-          setTeamCoverage(Math.round(tData.coverage_score || 0));
-          
           if (tData.member_ids && tData.member_ids.length > 0) {
             const members = [];
             for (const mid of tData.member_ids) {
@@ -174,6 +190,35 @@ export default function CreateTeam() {
 
     loadTeam();
   }, []);
+
+  useEffect(() => {
+    if (!requiredSkills || requiredSkills.length === 0) {
+      setTeamCoverage(0);
+      return;
+    }
+    
+    const teamSkills = new Set<string>();
+    
+    // Get all valid team member IDs including currently invited ones
+    const allMemberIds = new Set(teamMembers.map(m => m.id));
+    invitedMemberIds.forEach(id => allMemberIds.add(id));
+    
+    for (const p of recruits) {
+      if (allMemberIds.has(p.id)) {
+        const skills = p.declared_skills || (p as any).skills || [];
+        skills.forEach((s: string) => teamSkills.add(s.toLowerCase().trim()));
+      }
+    }
+    
+    let matchCount = 0;
+    for (const reqSkill of requiredSkills) {
+      if (teamSkills.has(reqSkill.toLowerCase().trim())) {
+        matchCount++;
+      }
+    }
+    
+    setTeamCoverage(Math.round((matchCount / requiredSkills.length) * 100));
+  }, [teamMembers, recruits, requiredSkills, invitedMemberIds]);
 
   const sortedRecruits = [...recruits].map(p => ({
     ...p,
