@@ -221,14 +221,8 @@ export default function TeamWorkspace() {
             </div>
           </div>
 
-          {/* Assigned Reviewer */}
-          <div className="bg-surface-container-lowest p-6 rounded-[24px] shadow-[0_20px_30px_-10px_rgba(214,203,191,0.4)] flex items-center gap-4">
-            <img className="w-12 h-12 rounded-full object-cover bg-surface-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5ZG3IF2C4nsEU4O9RC_qvd0Qr0Dqoc1o7gi_Yz9b3KBUqoN4qNZ5CQo0II3DGmC6DFk3_g57dT7hcxy5Bi7zacF9E1Yph2CJoZrlDQh0Qfmykq0PYi2Kj_xZ1udSfBEIG4aMHZWA8ovJRSa2qdpfDhj6HQeWIQa7K1GySDzDI8lsIcUT8EGysD1oUwMUdmAH3xo0tX2u7_W2R0MLH8XuYnrwgtHb6kGlWOZaDYn9VRrMF_v4iGvXnx3U1FBXPnQsyzEuNnmHkwx8" alt="Reviewer" />
-            <div>
-              <p className="text-outline text-label-sm uppercase tracking-wider">Assigned Reviewer</p>
-              <p className="font-headline-sm text-[24px] text-on-surface truncate">Dr. Sarah Jenkins</p>
-            </div>
-          </div>
+       
+          
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-stack-lg">
