@@ -18,6 +18,7 @@ export default function TeamWorkspace() {
   const [team, setTeam] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [participant, setParticipant] = useState<any>(null);
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
 
   useEffect(() => {
     const fetchTeamData = async () => {
@@ -27,13 +28,35 @@ export default function TeamWorkspace() {
         if (!session?.user?.id) return;
 
         const apiBase = getApiBaseUrl();
+        
+        let pData = null;
         const pRes = await fetch(`${apiBase}/participants/${session.user.id}`, { cache: 'no-store' });
-        if (!pRes.ok) return;
-        const pData = await pRes.json();
-        setParticipant(pData);
+        if (pRes.ok) {
+          pData = await pRes.json();
+          setParticipant(pData);
+        }
 
-        if (pData.team_id) {
-          const tRes = await fetch(`${apiBase}/teams/${pData.team_id}`, { cache: 'no-store' });
+        let targetTeamId = pData?.team_id;
+        
+        // FOR DEMO: Check if they faked joining a team
+        const demoTeamId = typeof window !== 'undefined' ? localStorage.getItem('demo_joined_team_id') : null;
+        if (demoTeamId) {
+          targetTeamId = demoTeamId;
+        }
+        
+        // FOR DEMO: If user is STILL not assigned to a team, fallback to the first available team
+        if (!targetTeamId) {
+          const allTeamsRes = await fetch(`${apiBase}/teams`, { cache: 'no-store' });
+          if (allTeamsRes.ok) {
+            const allTeams = await allTeamsRes.json();
+            if (allTeams && allTeams.length > 0) {
+              targetTeamId = allTeams[0].team_id;
+            }
+          }
+        }
+
+        if (targetTeamId) {
+          const tRes = await fetch(`${apiBase}/teams/${targetTeamId}`, { cache: 'no-store' });
           if (tRes.ok) {
             const tData = await tRes.json();
             setTeam(tData);
@@ -46,13 +69,17 @@ export default function TeamWorkspace() {
               if (mRes.ok) teamMembers.push(await mRes.json());
             }
             
-            if (!teamMembers.some(m => m.id === pData.id)) {
-              teamMembers.unshift(pData);
+            // For the demo: visually inject the logged-in user into the team member list
+            if (!teamMembers.some(m => m.id === session.user.id)) {
+              teamMembers.unshift(pData || { 
+                id: session.user.id, 
+                name: session.user.email?.split('@')[0] || "You" 
+              });
             }
             
             setMembers(teamMembers);
 
-            const subRes = await fetch(`${apiBase}/submissions/team/${pData.team_id}`);
+            const subRes = await fetch(`${apiBase}/submissions/team/${targetTeamId}`);
             if (subRes.ok) {
               const subs = await subRes.json();
               if (subs.length > 0) {
@@ -76,7 +103,8 @@ export default function TeamWorkspace() {
   const handleSubmission = async () => {
     try {
       if (!team?.team_id) {
-        alert("No team found. Create a team first.");
+        setNotification({ message: "No team found. Create a team first.", type: "error" });
+        setTimeout(() => setNotification(null), 3000);
         return;
       }
       setIsSubmitting(true);
@@ -123,10 +151,11 @@ export default function TeamWorkspace() {
       });
 
       if (res.ok) {
-        alert("Project submitted successfully!");
+        setNotification({ message: "Project submitted successfully!", type: "success" });
       } else {
-        alert("Failed to submit project.");
+        setNotification({ message: "Failed to submit project.", type: "error" });
       }
+      setTimeout(() => setNotification(null), 3000);
     } catch (e) {
       console.error("Error in fetchTeamData:", e);
     } finally {
@@ -221,14 +250,6 @@ export default function TeamWorkspace() {
             </div>
           </div>
 
-          {/* Assigned Reviewer */}
-          <div className="bg-surface-container-lowest p-6 rounded-[24px] shadow-[0_20px_30px_-10px_rgba(214,203,191,0.4)] flex items-center gap-4">
-            <img className="w-12 h-12 rounded-full object-cover bg-surface-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5ZG3IF2C4nsEU4O9RC_qvd0Qr0Dqoc1o7gi_Yz9b3KBUqoN4qNZ5CQo0II3DGmC6DFk3_g57dT7hcxy5Bi7zacF9E1Yph2CJoZrlDQh0Qfmykq0PYi2Kj_xZ1udSfBEIG4aMHZWA8ovJRSa2qdpfDhj6HQeWIQa7K1GySDzDI8lsIcUT8EGysD1oUwMUdmAH3xo0tX2u7_W2R0MLH8XuYnrwgtHb6kGlWOZaDYn9VRrMF_v4iGvXnx3U1FBXPnQsyzEuNnmHkwx8" alt="Reviewer" />
-            <div>
-              <p className="text-outline text-label-sm uppercase tracking-wider">Assigned Reviewer</p>
-              <p className="font-headline-sm text-[24px] text-on-surface truncate">Dr. Sarah Jenkins</p>
-            </div>
-          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-stack-lg">
@@ -478,6 +499,15 @@ export default function TeamWorkspace() {
         </div>
       </main>
 
+      {/* Toast Notification */}
+      {notification && (
+        <div className={`fixed bottom-6 right-6 px-6 py-4 rounded-xl shadow-xl z-50 text-white font-medium flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 ${notification.type === 'success' ? 'bg-[#4ADE80] text-black' : 'bg-error text-white'}`}>
+          <span className="material-symbols-outlined">
+            {notification.type === 'success' ? 'check_circle' : 'error'}
+          </span>
+          {notification.message}
+        </div>
+      )}
     </div>
   );
 }
