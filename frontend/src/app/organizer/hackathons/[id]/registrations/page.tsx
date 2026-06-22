@@ -6,7 +6,7 @@ export default async function HackathonRegistrationsPage() {
 
   return (
     <RegistrationIntelligenceModule
-      title="Winter 2024 Registrations"
+      title="JUNE 2026 registrations"
       subtitle="Review duplicate-risk decisions, FaceScan status, and explainable registration pipeline signals."
       initialRegistrations={registrations}
     />
